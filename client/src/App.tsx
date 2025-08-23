@@ -1,833 +1,2416 @@
-import React, { useState } from 'react';
+// File: client/src/App.tsx
+// Complete SMMA Dashboard System with Django Backend Integration
+
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { User, DollarSign, Users, MessageSquare, BarChart3, Settings, LogOut, Eye, EyeOff, Plus, Search, Download, CheckCircle, XCircle, Clock, AlertCircle, TrendingUp, Target, FileText, Bell, Menu, X } from 'lucide-react';
 
 // Types
-interface Service {
+interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'client';
+  avatar?: string;
+  company?: string;
+}
+
+interface Client {
   id: string;
   name: string;
-  platform: 'instagram' | 'tiktok' | 'youtube';
-  type: 'followers' | 'likes' | 'comments' | 'views' | 'shares' | 'subscribers';
+  email: string;
+  company: string;
+  package: string;
+  monthlyFee: number;
+  startDate: string;
+  status: 'active' | 'pending' | 'paused';
+  paymentStatus: 'paid' | 'overdue' | 'pending';
+  platforms: string[];
+  accountManager: string;
+  nextPayment: string;
+  totalSpent: number;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  clientId: string;
+  assignedTo: string;
+  status: 'pending' | 'in-progress' | 'review' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string;
   description: string;
-  icon: string;
-  minQuantity: number;
-  maxQuantity: number;
-  basePrice: number;
-  features: string[];
+  createdAt: string;
 }
 
-interface ServiceCategory {
-  platform: 'instagram' | 'tiktok' | 'youtube';
-  name: string;
-  icon: string;
-  color: string;
-  gradient: string;
-  services: Service[];
-}
-
-interface Package {
+interface ContentPost {
   id: string;
-  serviceId: string;
-  name: string;
-  quantity: number;
-  price: number;
-  originalPrice?: number;
-  discount?: number;
-  popular?: boolean;
-  features: string[];
-  deliveryTime: string;
-  guarantee: string;
-}
-
-interface Testimonial {
-  id: string;
-  name: string;
-  username: string;
+  clientId: string;
   platform: string;
-  avatar: string;
-  rating: number;
-  comment: string;
-  verified: boolean;
-  beforeFollowers: number;
-  afterFollowers: number;
+  content: string;
+  scheduledDate: string;
+  status: 'draft' | 'pending-approval' | 'approved' | 'posted';
+  imageUrl?: string;
+  engagementRate?: number;
 }
 
-// Sample Data
-const serviceCategories: ServiceCategory[] = [
-  {
-    platform: 'instagram',
-    name: 'Instagram Growth',
-    icon: '📸',
-    color: 'bg-gradient-to-r from-purple-600 to-pink-600',
-    gradient: 'from-purple-600 to-pink-600',
-    services: [
-      {
-        id: 'ig-followers',
-        name: 'Instagram Followers',
-        platform: 'instagram',
-        type: 'followers',
-        description: 'Grow your Instagram following with real, active followers',
-        icon: '👥',
-        minQuantity: 100,
-        maxQuantity: 100000,
-        basePrice: 15,
-        features: ['Real followers', 'Gradual delivery', '90-day guarantee', '24/7 support']
-      },
-      {
-        id: 'ig-likes',
-        name: 'Instagram Likes',
-        platform: 'instagram',
-        type: 'likes',
-        description: 'Boost engagement with authentic Instagram likes',
-        icon: '❤️',
-        minQuantity: 50,
-        maxQuantity: 50000,
-        basePrice: 8,
-        features: ['Instant delivery', 'High quality', '30-day refill', 'Safe & secure']
-      },
-      {
-        id: 'ig-comments',
-        name: 'Instagram Comments',
-        platform: 'instagram',
-        type: 'comments',
-        description: 'Get meaningful comments from real users',
-        icon: '💬',
-        minQuantity: 10,
-        maxQuantity: 5000,
-        basePrice: 25,
-        features: ['Custom comments', 'Native language', 'Real profiles', 'Manual review']
-      }
-    ]
-  },
-  {
-    platform: 'tiktok',
-    name: 'TikTok Growth',
-    icon: '🎵',
-    color: 'bg-gradient-to-r from-black to-red-600',
-    gradient: 'from-black to-red-600',
-    services: [
-      {
-        id: 'tt-followers',
-        name: 'TikTok Followers',
-        platform: 'tiktok',
-        type: 'followers',
-        description: 'Build your TikTok audience with engaged followers',
-        icon: '👥',
-        minQuantity: 100,
-        maxQuantity: 100000,
-        basePrice: 12,
-        features: ['Active followers', 'Gradual growth', '60-day guarantee', 'Algorithm boost']
-      },
-      {
-        id: 'tt-likes',
-        name: 'TikTok Likes',
-        platform: 'tiktok',
-        type: 'likes',
-        description: 'Increase your video likes for better reach',
-        icon: '❤️',
-        minQuantity: 50,
-        maxQuantity: 100000,
-        basePrice: 6,
-        features: ['Instant likes', 'Viral potential', '30-day refill', 'FYP boost']
-      }
-    ]
-  },
-  {
-    platform: 'youtube',
-    name: 'YouTube Growth',
-    icon: '📺',
-    color: 'bg-gradient-to-r from-red-600 to-red-700',
-    gradient: 'from-red-600 to-red-700',
-    services: [
-      {
-        id: 'yt-subscribers',
-        name: 'YouTube Subscribers',
-        platform: 'youtube',
-        type: 'subscribers',
-        description: 'Grow your YouTube channel with real subscribers',
-        icon: '👥',
-        minQuantity: 100,
-        maxQuantity: 100000,
-        basePrice: 18,
-        features: ['Real subscribers', 'Monetization boost', '120-day guarantee', 'Channel growth']
-      },
-      {
-        id: 'yt-views',
-        name: 'YouTube Views',
-        platform: 'youtube',
-        type: 'views',
-        description: 'Increase video views and watch time',
-        icon: '👁️',
-        minQuantity: 1000,
-        maxQuantity: 10000000,
-        basePrice: 7,
-        features: ['High retention', 'Watch time boost', 'SEO benefits', 'Monetization eligible']
-      }
-    ]
-  }
-];
+interface PerformanceData {
+  id: string;
+  clientId: string;
+  month: string;
+  followers: number;
+  engagement: number;
+  reach: number;
+  clicks: number;
+  impressions: number;
+  growthRate: number;
+}
 
-const packages: Package[] = [
-  {
-    id: 'ig-followers-growth',
-    serviceId: 'ig-followers',
-    name: 'Growth',
-    quantity: 5000,
-    price: 65,
-    originalPrice: 75,
-    discount: 13,
-    popular: true,
-    features: ['5K Real Followers', '5-7 day delivery', '90-day guarantee', 'Priority support'],
-    deliveryTime: '5-7 days',
-    guarantee: '90 days'
-  },
-  {
-    id: 'tt-followers-viral',
-    serviceId: 'tt-followers',
-    name: 'Viral',
-    quantity: 10000,
-    price: 100,
-    originalPrice: 120,
-    discount: 17,
-    popular: true,
-    features: ['10K Active Followers', '5-8 day delivery', '60-day guarantee', 'Algorithm boost'],
-    deliveryTime: '5-8 days',
-    guarantee: '60 days'
-  },
-  {
-    id: 'yt-subs-monetize',
-    serviceId: 'yt-subscribers',
-    name: 'Monetization',
-    quantity: 4000,
-    price: 65,
-    originalPrice: 72,
-    discount: 10,
-    popular: true,
-    features: ['4K Real Subscribers', 'Monetization ready', '7-10 day delivery', '120-day guarantee'],
-    deliveryTime: '7-10 days',
-    guarantee: '120 days'
-  }
-];
+interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: string;
+  read: boolean;
+}
 
-const testimonials: Testimonial[] = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    username: '@sarahcreates',
-    platform: 'Instagram',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b47c?w=100&h=100&fit=crop&crop=face',
-    rating: 5,
-    comment: 'Amazing service! My followers grew from 2K to 15K in just 2 weeks. The quality is incredible and they\'re all real, active users.',
-    verified: true,
-    beforeFollowers: 2000,
-    afterFollowers: 15000
-  },
-  {
-    id: '2',
-    name: 'Marcus Chen',
-    username: '@marcustech',
-    platform: 'TikTok',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
-    rating: 5,
-    comment: 'SocialBoost helped me hit 100K followers! My videos are now getting on the FYP regularly. Best investment I\'ve made.',
-    verified: true,
-    beforeFollowers: 15000,
-    afterFollowers: 100000
-  },
-  {
-    id: '3',
-    name: 'Emma Rodriguez',
-    username: '@emmalifestyle',
-    platform: 'YouTube',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face',
-    rating: 5,
-    comment: 'Finally hit the monetization threshold! The subscribers are real and engaged. My watch time has increased dramatically.',
-    verified: true,
-    beforeFollowers: 800,
-    afterFollowers: 4200
+interface Invoice {
+  id: string;
+  clientId: string;
+  amount: number;
+  dueDate: string;
+  status: 'paid' | 'pending' | 'overdue';
+  invoiceNumber: string;
+  createdAt: string;
+}
+
+// API Service
+class ApiService {
+  private baseUrl = 'http://localhost:8000/api';
+  
+  private getHeaders(includeAuth = true) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (includeAuth) {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    
+    return headers;
   }
-];
+
+  // Auth
+  async login(email: string, password: string): Promise<AuthUser> {
+    const response = await fetch(`${this.baseUrl}/auth/login/`, {
+      method: 'POST',
+      headers: this.getHeaders(false),
+      body: JSON.stringify({ email, password })
+    });
+    
+    if (!response.ok) throw new Error('Login failed');
+    
+    const data = await response.json();
+    localStorage.setItem('auth_token', data.token);
+    return data.user;
+  }
+
+  async register(userData: {
+    email: string;
+    password: string;
+    name: string;
+    role: 'admin' | 'client';
+    company?: string;
+  }): Promise<AuthUser> {
+    const response = await fetch(`${this.baseUrl}/auth/register/`, {
+      method: 'POST',
+      headers: this.getHeaders(false),
+      body: JSON.stringify(userData)
+    });
+    
+    if (!response.ok) throw new Error('Registration failed');
+    
+    const data = await response.json();
+    localStorage.setItem('auth_token', data.token);
+    return data.user;
+  }
+
+  async logout(): Promise<void> {
+    await fetch(`${this.baseUrl}/auth/logout/`, {
+      method: 'POST',
+      headers: this.getHeaders()
+    });
+    localStorage.removeItem('auth_token');
+  }
+
+  async getCurrentUser(): Promise<AuthUser> {
+    const response = await fetch(`${this.baseUrl}/auth/me/`, {
+      headers: this.getHeaders()
+    });
+    
+    if (!response.ok) throw new Error('Failed to get current user');
+    return response.json();
+  }
+
+  // Clients
+  async getClients(): Promise<Client[]> {
+    const response = await fetch(`${this.baseUrl}/clients/`, {
+      headers: this.getHeaders()
+    });
+    return response.json();
+  }
+
+  async createClient(clientData: Partial<Client>): Promise<Client> {
+    const response = await fetch(`${this.baseUrl}/clients/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(clientData)
+    });
+    return response.json();
+  }
+
+  async updateClient(id: string, clientData: Partial<Client>): Promise<Client> {
+    const response = await fetch(`${this.baseUrl}/clients/${id}/`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(clientData)
+    });
+    return response.json();
+  }
+
+  // Tasks
+  async getTasks(): Promise<Task[]> {
+    const response = await fetch(`${this.baseUrl}/tasks/`, {
+      headers: this.getHeaders()
+    });
+    return response.json();
+  }
+
+  async createTask(taskData: Partial<Task>): Promise<Task> {
+    const response = await fetch(`${this.baseUrl}/tasks/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(taskData)
+    });
+    return response.json();
+  }
+
+  async updateTask(id: string, taskData: Partial<Task>): Promise<Task> {
+    const response = await fetch(`${this.baseUrl}/tasks/${id}/`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(taskData)
+    });
+    return response.json();
+  }
+
+  // Content
+  async getContent(): Promise<ContentPost[]> {
+    const response = await fetch(`${this.baseUrl}/content/`, {
+      headers: this.getHeaders()
+    });
+    return response.json();
+  }
+
+  async createContent(contentData: Partial<ContentPost>): Promise<ContentPost> {
+    const response = await fetch(`${this.baseUrl}/content/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(contentData)
+    });
+    return response.json();
+  }
+
+  async updateContent(id: string, contentData: Partial<ContentPost>): Promise<ContentPost> {
+    const response = await fetch(`${this.baseUrl}/content/${id}/`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(contentData)
+    });
+    return response.json();
+  }
+
+  // Performance
+  async getPerformanceData(clientId?: string): Promise<PerformanceData[]> {
+    const url = clientId 
+      ? `${this.baseUrl}/performance/?client_id=${clientId}`
+      : `${this.baseUrl}/performance/`;
+    
+    const response = await fetch(url, {
+      headers: this.getHeaders()
+    });
+    return response.json();
+  }
+
+  async createPerformanceData(data: Partial<PerformanceData>): Promise<PerformanceData> {
+    const response = await fetch(`${this.baseUrl}/performance/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  }
+
+  // Messages
+  async getMessages(): Promise<Message[]> {
+    const response = await fetch(`${this.baseUrl}/messages/`, {
+      headers: this.getHeaders()
+    });
+    return response.json();
+  }
+
+  async sendMessage(messageData: {
+    receiverId: string;
+    content: string;
+  }): Promise<Message> {
+    const response = await fetch(`${this.baseUrl}/messages/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(messageData)
+    });
+    return response.json();
+  }
+
+  // Invoices
+  async getInvoices(): Promise<Invoice[]> {
+    const response = await fetch(`${this.baseUrl}/invoices/`, {
+      headers: this.getHeaders()
+    });
+    return response.json();
+  }
+
+  async createInvoice(invoiceData: Partial<Invoice>): Promise<Invoice> {
+    const response = await fetch(`${this.baseUrl}/invoices/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(invoiceData)
+    });
+    return response.json();
+  }
+}
+
+// Context
+const AuthContext = createContext<{
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (userData: any) => Promise<boolean>;
+  logout: () => void;
+  loading: boolean;
+}>({
+  user: null,
+  login: async () => false,
+  register: async () => false,
+  logout: () => {},
+  loading: true
+});
+
+const DataContext = createContext<{
+  clients: Client[];
+  tasks: Task[];
+  content: ContentPost[];
+  performance: PerformanceData[];
+  messages: Message[];
+  invoices: Invoice[];
+  refreshData: () => void;
+  loading: boolean;
+}>({
+  clients: [],
+  tasks: [],
+  content: [],
+  performance: [],
+  messages: [],
+  invoices: [],
+  refreshData: () => {},
+  loading: true
+});
 
 // UI Components
-interface ButtonProps {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  children: React.ReactNode;
-  className?: string;
-  [key: string]: any;
-}
-
-const Button = ({ variant = 'primary', size = 'md', children, className = '', ...props }: ButtonProps) => {
-  const baseClasses = 'font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
-  
-  const variants: Record<string, string> = {
-    primary: 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl',
+const Button = ({ variant = 'primary', size = 'md', children, className = '', ...props }) => {
+  const baseClasses = 'font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 flex items-center gap-2 justify-center';
+  const variants = {
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg',
     secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200',
-    outline: 'border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white',
-    ghost: 'text-purple-600 hover:bg-purple-50'
+    outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white',
+    danger: 'bg-red-600 text-white hover:bg-red-700',
+    success: 'bg-green-600 text-white hover:bg-green-700'
   };
-  
-  const sizes: Record<string, string> = {
-    sm: 'px-4 py-2 text-sm',
-    md: 'px-6 py-3 text-base',
-    lg: 'px-8 py-4 text-lg'
+  const sizes = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-base',
+    lg: 'px-6 py-3 text-lg'
   };
   
   return (
-    <button
-      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
-      {...props}
-    >
+    <button className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
       {children}
     </button>
   );
 };
 
-interface CardProps {
-  children: React.ReactNode;
-  className?: string;
-  hover?: boolean;
-  gradient?: boolean;
-}
-
-const Card = ({ children, className = '', hover = false, gradient = false }: CardProps) => {
-  const baseClasses = 'bg-white rounded-xl shadow-lg p-6';
-  const hoverClasses = hover ? 'hover:shadow-2xl hover:-translate-y-1 transition-all duration-300' : '';
-  const gradientClasses = gradient ? 'bg-gradient-to-br from-white to-purple-50' : '';
-  
-  return (
-    <div className={`${baseClasses} ${hoverClasses} ${gradientClasses} ${className}`}>
+const Card = ({ children, className = '', title, action }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-gray-200 ${className}`}>
+    {title && (
+      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        {action}
+      </div>
+    )}
+    <div className="p-6">
       {children}
     </div>
-  );
-};
+  </div>
+);
 
-interface BadgeProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
-  size?: 'sm' | 'md';
-}
-
-const Badge = ({ children, variant = 'primary', size = 'sm' }: BadgeProps) => {
-  const variants: Record<string, string> = {
-    primary: 'bg-purple-100 text-purple-800',
-    secondary: 'bg-gray-100 text-gray-800',
+const Badge = ({ children, variant = 'default' }) => {
+  const variants = {
+    default: 'bg-gray-100 text-gray-800',
     success: 'bg-green-100 text-green-800',
     warning: 'bg-yellow-100 text-yellow-800',
-    danger: 'bg-red-100 text-red-800'
-  };
-  
-  const sizes: Record<string, string> = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-1 text-sm'
+    danger: 'bg-red-100 text-red-800',
+    primary: 'bg-blue-100 text-blue-800'
   };
   
   return (
-    <span className={`inline-flex items-center font-medium rounded-full ${variants[variant]} ${sizes[size]}`}>
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${variants[variant]}`}>
       {children}
     </span>
   );
 };
 
-// Main Components
-const Header = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount] = useState(0);
+const Input = ({ label, error, className = '', ...props }) => (
+  <div className="w-full">
+    {label && <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>}
+    <input
+      className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+        error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''
+      } ${className}`}
+      {...props}
+    />
+    {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+  </div>
+);
 
+const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+  if (!isOpen) return null;
+  
+  const sizes = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl'
+  };
+  
   return (
-    <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              SocialBoost Pro
-            </h1>
-          </div>
-
-          <nav className="hidden md:flex space-x-8">
-            <a href="#" className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-colors">Home</a>
-            <div className="relative group">
-              <button className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-colors">
-                Services ↓
-              </button>
-              <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <div className="py-1">
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50">Instagram Growth</a>
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50">TikTok Growth</a>
-                  <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50">YouTube Growth</a>
-                </div>
-              </div>
-            </div>
-            <a href="#" className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-colors">Pricing</a>
-            <a href="#" className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-colors">How It Works</a>
-            <a href="#" className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-colors">Contact</a>
-          </nav>
-
-          <div className="flex items-center space-x-4">
-            <button className="relative p-2 text-gray-700 hover:text-purple-600 transition-colors">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6.5-5a2 2 0 100 4 2 2 0 000-4zm-7 0a2 2 0 100 4 2 2 0 000-4z" />
-              </svg>
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            <Button size="sm">Get Started</Button>
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 text-gray-700 hover:text-purple-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+        <div className={`inline-block w-full ${sizes[size]} p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl relative z-50`}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-6 h-6" />
             </button>
           </div>
-        </div>
-
-        {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">Home</a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">Instagram Growth</a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">TikTok Growth</a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">YouTube Growth</a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">Pricing</a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">How It Works</a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-purple-600 transition-colors">Contact</a>
-            </div>
-          </div>
-        )}
-      </div>
-    </header>
-  );
-};
-
-const Hero = () => {
-  return (
-    <section className="relative bg-gradient-to-br from-purple-50 via-white to-pink-50 py-20 overflow-hidden">
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-20 h-20 bg-purple-200 rounded-full opacity-20 animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-32 h-32 bg-pink-200 rounded-full opacity-20 animate-pulse"></div>
-        <div className="absolute bottom-20 left-1/4 w-16 h-16 bg-blue-200 rounded-full opacity-20 animate-pulse"></div>
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 text-sm font-medium mb-8">
-            <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-            Trusted by 50,000+ Creators Worldwide
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-            Grow Your
-            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent block">
-              Social Media
-            </span>
-            <span className="text-4xl md:text-6xl">Instantly 🚀</span>
-          </h1>
-
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Get real followers, likes, and engagement from authentic users. 
-            <span className="font-semibold text-purple-600"> Safe, fast, and guaranteed.</span>
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-8 mb-10 text-center">
-            <div>
-              <div className="text-3xl font-bold text-purple-600">2M+</div>
-              <div className="text-gray-600">Followers Delivered</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-pink-600">50K+</div>
-              <div className="text-gray-600">Happy Clients</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-blue-600">98%</div>
-              <div className="text-gray-600">Success Rate</div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <Button size="lg" className="min-w-48">
-              🎯 Start Growing Now
-            </Button>
-            <Button variant="outline" size="lg" className="min-w-48">
-              📊 View Pricing
-            </Button>
-          </div>
-
-          <div className="flex justify-center items-center space-x-8 text-gray-400">
-            <span className="text-sm">Works with:</span>
-            <div className="flex space-x-6">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">IG</div>
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold text-sm">TT</div>
-              <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">YT</div>
-            </div>
-          </div>
+          {children}
         </div>
       </div>
-    </section>
-  );
-};
-
-const ServiceOverview = () => {
-  return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Choose Your Platform
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Grow your presence on the world's biggest social media platforms. 
-            Real users, instant results, guaranteed quality.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {serviceCategories.map((category) => (
-            <Card key={category.platform} hover className="text-center group">
-              <div className={`w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-r ${category.color} flex items-center justify-center text-4xl transform group-hover:scale-110 transition-transform duration-300`}>
-                {category.icon}
-              </div>
-
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                {category.name}
-              </h3>
-
-              <div className="space-y-3 mb-8">
-                {category.services.map((service) => (
-                  <div key={service.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-lg">{service.icon}</span>
-                      <span className="font-medium text-gray-700">{service.name}</span>
-                    </div>
-                    <span className="text-sm text-purple-600 font-semibold">
-                      ${service.basePrice}/1K
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <Button 
-                variant="outline" 
-                className="w-full group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600"
-              >
-                View {category.name} Packages
-              </Button>
-            </Card>
-          ))}
-        </div>
-
-        <div className="text-center mt-16">
-          <div className="inline-flex items-center space-x-4 bg-gradient-to-r from-purple-50 to-pink-50 px-8 py-4 rounded-2xl">
-            <span className="text-lg">🔥</span>
-            <span className="text-gray-700">
-              <span className="font-semibold">Limited Time:</span> Get 20% off your first order
-            </span>
-            <Button size="sm">
-              Claim Discount
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const PricingPreview = () => {
-  const featuredPackages = packages.filter(pkg => pkg.popular).slice(0, 3);
-
-  return (
-    <section className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            No hidden fees, no contracts. Choose the package that fits your goals 
-            and start growing today.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {featuredPackages.map((pkg) => (
-            <Card key={pkg.id} hover className="relative text-center">
-              {pkg.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge variant="primary" size="md">
-                    🔥 Most Popular
-                  </Badge>
-                </div>
-              )}
-
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                {pkg.name}
-              </h3>
-
-              <div className="mb-6">
-                {pkg.originalPrice && (
-                  <div className="text-lg text-gray-500 line-through">
-                    ${pkg.originalPrice}
-                  </div>
-                )}
-                <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  ${pkg.price}
-                </div>
-                {pkg.discount && (
-                  <div className="text-green-600 font-semibold">
-                    Save {pkg.discount}%
-                  </div>
-                )}
-              </div>
-
-              <div className="text-xl font-semibold text-gray-700 mb-6">
-                {pkg.quantity.toLocaleString()} {pkg.serviceId.includes('followers') ? 'Followers' : 
-                 pkg.serviceId.includes('likes') ? 'Likes' : 
-                 pkg.serviceId.includes('subscribers') ? 'Subscribers' : 'Items'}
-              </div>
-
-              <ul className="space-y-3 mb-8">
-                {pkg.features.map((feature, index) => (
-                  <li key={index} className="flex items-center space-x-3">
-                    <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-gray-700">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Button 
-                className="w-full"
-                variant={pkg.popular ? "primary" : "outline"}
-              >
-                Get Started
-              </Button>
-
-              <p className="text-sm text-gray-500 mt-4">
-                {pkg.guarantee} guarantee
-              </p>
-            </Card>
-          ))}
-        </div>
-
-        <div className="text-center">
-          <Button variant="outline" size="lg">
-            View All Pricing Plans
-          </Button>
-        </div>
-
-        <div className="mt-16 bg-gradient-to-r from-green-50 to-blue-50 rounded-3xl p-8">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="flex items-center space-x-4 mb-4 md:mb-0">
-              <div className="w-16 h-16 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center text-2xl">
-                🛡️
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900">
-                  30-Day Money Back Guarantee
-                </h3>
-                <p className="text-gray-600">
-                  Not satisfied? Get your money back, no questions asked.
-                </p>
-              </div>
-            </div>
-            <Button>
-              Learn More
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const Testimonials = () => {
-  return (
-    <section className="py-20 bg-gradient-to-br from-purple-50 to-pink-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Success Stories
-          </h2>
-          <p className="text-xl text-gray-600">
-            Real results from real creators who trusted us with their growth
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial) => (
-            <div key={testimonial.id} className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="flex items-center space-x-3 mb-4">
-                <img 
-                  src={testimonial.avatar} 
-                  alt={testimonial.name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
-                    {testimonial.verified && (
-                      <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500">{testimonial.username} • {testimonial.platform}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center mb-3">
-                {[...Array(5)].map((_, i) => (
-                  <svg 
-                    key={i} 
-                    className={`w-5 h-5 ${i < testimonial.rating ? 'text-yellow-400' : 'text-gray-300'}`} 
-                    fill="currentColor" 
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-
-              <p className="text-gray-700 mb-4 italic">"{testimonial.comment}"</p>
-
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="text-center">
-                    <div className="font-semibold text-gray-900">{testimonial.beforeFollowers.toLocaleString()}</div>
-                    <div className="text-gray-500">Before</div>
-                  </div>
-                  <div className="text-2xl">📈</div>
-                  <div className="text-center">
-                    <div className="font-semibold text-purple-600">{testimonial.afterFollowers.toLocaleString()}</div>
-                    <div className="text-gray-500">After</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-16 text-center bg-white rounded-3xl p-12 shadow-xl">
-          <h3 className="text-3xl font-bold text-gray-900 mb-4">
-            Ready to Join Them?
-          </h3>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Start your growth journey today and see why thousands of creators trust SocialBoost Pro
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="min-w-48">
-              🚀 Get Started Now
-            </Button>
-            <Button variant="outline" size="lg" className="min-w-48">
-              💬 Talk to an Expert
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const Footer = () => {
-  return (
-    <footer className="bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="space-y-4">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              SocialBoost Pro
-            </h3>
-            <p className="text-gray-400 text-sm">
-              Your trusted partner for authentic social media growth. Real followers, real engagement, real results.
-            </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
-                </svg>
-              </a>
-              <a href="#" className="text-gray-400 hover:text-purple-400 transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.174-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.097.118.112.221.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.402.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.357-.629-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24.009 12.017 24.009c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641.001 12.017.001z"/>
-                </svg>
-              </a>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-lg font-semibold mb-4">Services</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Instagram Growth</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">TikTok Growth</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">YouTube Growth</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Custom Packages</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-lg font-semibold mb-4">Support</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">FAQ</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Contact Us</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Live Chat</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-lg font-semibold mb-4">Legal</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Terms of Service</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Refund Policy</a></li>
-              <li><a href="#" className="hover:text-purple-400 transition-colors">Cookie Policy</a></li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-800 mt-12 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm">
-              © 2025 SocialBoost Pro. All rights reserved.
-            </p>
-            <div className="flex items-center space-x-4 mt-4 md:mt-0">
-              <div className="flex items-center space-x-2 text-sm text-gray-400">
-                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span>SSL Secured</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-400">
-                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span>Safe & Secure</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-};
-
-// Main App Component
-const SocialBoostPro = () => {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1">
-        <Hero />
-        <ServiceOverview />
-        <PricingPreview />
-        <Testimonials />
-      </main>
-      <Footer />
     </div>
   );
 };
 
-export default SocialBoostPro;
+// Auth Components
+const AuthForm = ({ isLogin, onToggle, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+    company: '',
+    role: 'client' as 'admin' | 'client'
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const api = new ApiService();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (isLogin) {
+        await api.login(formData.email, formData.password);
+      } else {
+        await api.register(formData);
+      }
+      onSuccess();
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isLogin ? 'Welcome Back' : 'Create Account'}
+          </h1>
+          <p className="text-gray-600">
+            {isLogin ? 'Sign in to your SMMA dashboard' : 'Join our SMMA platform'}
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {!isLogin && (
+            <>
+              <Input
+                label="Full Name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+              
+              <Input
+                label="Company Name"
+                type="text"
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'client' })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="client">Client</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <Input
+            label="Email Address"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            required
+          />
+
+          <div className="relative">
+            <Input
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : (isLogin ? 'Sign In' : 'Create Account')}
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={onToggle}
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Dashboard Layout
+const DashboardLayout = ({ children, user, onLogout }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  const navigation = user?.role === 'admin' ? [
+    { name: 'Overview', href: '#overview', icon: BarChart3 },
+    { name: 'Clients', href: '#clients', icon: Users },
+    { name: 'Tasks', href: '#tasks', icon: CheckCircle },
+    { name: 'Content', href: '#content', icon: FileText },
+    { name: 'Performance', href: '#performance', icon: TrendingUp },
+    { name: 'Messages', href: '#messages', icon: MessageSquare },
+    { name: 'Invoices', href: '#invoices', icon: DollarSign },
+    { name: 'Settings', href: '#settings', icon: Settings }
+  ] : [
+    { name: 'Overview', href: '#overview', icon: BarChart3 },
+    { name: 'Content', href: '#content', icon: FileText },
+    { name: 'Performance', href: '#performance', icon: TrendingUp },
+    { name: 'Messages', href: '#messages', icon: MessageSquare },
+    { name: 'Billing', href: '#billing', icon: DollarSign }
+  ];
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+        <div className="flex items-center justify-between h-16 px-6 bg-blue-600">
+          <h1 className="text-xl font-bold text-white">SMMA Pro</h1>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-white hover:text-blue-200"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        <nav className="mt-8">
+          {navigation.map((item) => (
+            <a
+              key={item.name}
+              href={item.href}
+              className="flex items-center px-6 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+            >
+              <item.icon className="w-5 h-5 mr-3" />
+              {item.name}
+            </a>
+          ))}
+        </nav>
+
+        <div className="absolute bottom-0 w-full p-6 border-t">
+          <div className="flex items-center mb-4">
+            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <User className="w-6 h-6 text-white" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLogout}
+            className="w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Bar */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-gray-600 hover:text-gray-900"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            
+            <div className="flex items-center space-x-4">
+              <Bell className="w-6 h-6 text-gray-400 hover:text-gray-600 cursor-pointer" />
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-6">
+          {children}
+        </main>
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+// Admin Dashboard Components
+const AdminOverview = () => {
+  const { clients, tasks, performance, invoices } = useContext(DataContext);
+  
+  const totalRevenue = invoices
+    .filter(inv => inv.status === 'paid')
+    .reduce((sum, inv) => sum + inv.amount, 0);
+  
+  const activeClients = clients.filter(c => c.status === 'active').length;
+  const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in-progress').length;
+  const overduePayments = invoices.filter(inv => inv.status === 'overdue').length;
+
+  const stats = [
+    { name: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-green-600' },
+    { name: 'Active Clients', value: activeClients, icon: Users, color: 'text-blue-600' },
+    { name: 'Pending Tasks', value: pendingTasks, icon: Clock, color: 'text-yellow-600' },
+    { name: 'Overdue Payments', value: overduePayments, icon: AlertCircle, color: 'text-red-600' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat) => (
+          <Card key={stat.name} className="hover:shadow-md transition-shadow">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <stat.icon className={`w-8 h-8 ${stat.color}`} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card title="Recent Tasks">
+          <div className="space-y-4">
+            {tasks.slice(0, 5).map((task) => (
+              <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{task.title}</p>
+                  <p className="text-sm text-gray-600">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                </div>
+                <Badge variant={
+                  task.status === 'completed' ? 'success' :
+                  task.status === 'in-progress' ? 'primary' :
+                  task.priority === 'high' ? 'danger' : 'default'
+                }>
+                  {task.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="Client Status">
+          <div className="space-y-4">
+            {clients.slice(0, 5).map((client) => (
+              <div key={client.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{client.name}</p>
+                  <p className="text-sm text-gray-600">{client.company}</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={
+                    client.paymentStatus === 'paid' ? 'success' :
+                    client.paymentStatus === 'overdue' ? 'danger' : 'warning'
+                  }>
+                    {client.paymentStatus}
+                  </Badge>
+                  <Badge variant={
+                    client.status === 'active' ? 'success' :
+                    client.status === 'pending' ? 'warning' : 'default'
+                  }>
+                    {client.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+const ClientManagement = () => {
+  const { clients, refreshData } = useContext(DataContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const filteredClients = clients.filter(client => {
+    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         client.company.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const openModal = (client?: Client) => {
+    setSelectedClient(client || null);
+    setIsModalOpen(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Client Management</h1>
+        <Button onClick={() => openModal()}>
+          <Plus className="w-4 h-4" />
+          Add Client
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search clients..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending</option>
+          <option value="paused">Paused</option>
+        </select>
+      </div>
+
+      {/* Client List */}
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Package</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monthly Fee</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredClients.map((client) => (
+                <tr key={client.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                      <div className="text-sm text-gray-500">{client.company}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{client.package}</div>
+                    <div className="text-sm text-gray-500">{client.platforms.join(', ')}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${client.monthlyFee.toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge variant={
+                      client.status === 'active' ? 'success' :
+                      client.status === 'pending' ? 'warning' : 'default'
+                    }>
+                      {client.status}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge variant={
+                      client.paymentStatus === 'paid' ? 'success' :
+                      client.paymentStatus === 'overdue' ? 'danger' : 'warning'
+                    }>
+                      {client.paymentStatus}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openModal(client)}
+                    >
+                      Edit
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Client Modal */}
+      <ClientModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        client={selectedClient}
+        onSave={refreshData}
+      />
+    </div>
+  );
+};
+
+// Client Modal Component
+interface ClientModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  client: Client | null;
+  onSave: () => void;
+}
+
+const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, client, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    package: '',
+    monthlyFee: 0,
+    platforms: [],
+    accountManager: '',
+    status: 'pending' as const
+  });
+
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        name: client.name,
+        email: client.email,
+        company: client.company,
+        package: client.package,
+        monthlyFee: client.monthlyFee,
+        platforms: client.platforms,
+        accountManager: client.accountManager,
+        status: client.status
+      });
+    } else {
+      setFormData({
+        name: '',
+        email: '',
+        company: '',
+        package: '',
+        monthlyFee: 0,
+        platforms: [],
+        accountManager: '',
+        status: 'pending'
+      });
+    }
+  }, [client]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const api = new ApiService();
+    
+    try {
+      if (client) {
+        await api.updateClient(client.id, formData);
+      } else {
+        await api.createClient(formData);
+      }
+      onSave();
+      onClose();
+    } catch (error) {
+      console.error('Failed to save client:', error);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={client ? 'Edit Client' : 'Add Client'} size="lg">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Full Name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            required
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Company"
+            value={formData.company}
+            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+            required
+          />
+          <Input
+            label="Package"
+            value={formData.package}
+            onChange={(e) => setFormData({ ...formData, package: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Monthly Fee"
+            type="number"
+            value={formData.monthlyFee}
+            onChange={(e) => setFormData({ ...formData, monthlyFee: Number(e.target.value) })}
+            required
+          />
+          <Input
+            label="Account Manager"
+            value={formData.accountManager}
+            onChange={(e) => setFormData({ ...formData, accountManager: e.target.value })}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+          <select
+            value={formData.status}
+            onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+          </select>
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            {client ? 'Update Client' : 'Add Client'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const TaskManagement = () => {
+  const { tasks, clients, refreshData } = useContext(DataContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const openModal = (task?: Task) => {
+    setSelectedTask(task || null);
+    setIsModalOpen(true);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'success';
+      case 'in-progress': return 'primary';
+      case 'review': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'danger';
+      case 'medium': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Task Management</h1>
+        <Button onClick={() => openModal()}>
+          <Plus className="w-4 h-4" />
+          Add Task
+        </Button>
+      </div>
+
+      {/* Task Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {tasks.map((task) => {
+          const client = clients.find(c => c.id === task.clientId);
+          return (
+            <Card key={task.id} className="hover:shadow-md transition-shadow">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between">
+                  <h3 className="font-semibold text-gray-900">{task.title}</h3>
+                  <Badge variant={getPriorityColor(task.priority)}>
+                    {task.priority}
+                  </Badge>
+                </div>
+                
+                <p className="text-sm text-gray-600">{task.description}</p>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Client:</span>
+                    <span className="text-sm font-medium">{client?.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Assigned:</span>
+                    <span className="text-sm font-medium">{task.assignedTo}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Due:</span>
+                    <span className="text-sm font-medium">{new Date(task.dueDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <Badge variant={getStatusColor(task.status)}>
+                    {task.status}
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={() => openModal(task)}>
+                    Edit
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Task Modal */}
+      <TaskModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        task={selectedTask}
+        onSave={refreshData}
+      />
+    </div>
+  );
+};
+
+const TaskModal = ({ isOpen, onClose, task, onSave }) => {
+  const { clients } = useContext(DataContext);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    clientId: '',
+    assignedTo: '',
+    status: 'pending' as const,
+    priority: 'medium' as const,
+    dueDate: ''
+  });
+
+  useEffect(() => {
+    if (task) {
+      setFormData({
+        title: task.title,
+        description: task.description,
+        clientId: task.clientId,
+        assignedTo: task.assignedTo,
+        status: task.status,
+        priority: task.priority,
+        dueDate: task.dueDate.split('T')[0]
+      });
+    } else {
+      setFormData({
+        title: '',
+        description: '',
+        clientId: '',
+        assignedTo: '',
+        status: 'pending',
+        priority: 'medium',
+        dueDate: ''
+      });
+    }
+  }, [task]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const api = new ApiService();
+    
+    try {
+      if (task) {
+        await api.updateTask(task.id, formData);
+      } else {
+        await api.createTask(formData);
+      }
+      onSave();
+      onClose();
+    } catch (error) {
+      console.error('Failed to save task:', error);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={task ? 'Edit Task' : 'Add Task'}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Task Title"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          required
+        />
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            rows={3}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
+            <select
+              value={formData.clientId}
+              onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          <Input
+            label="Assigned To"
+            value={formData.assignedTo}
+            onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="pending">Pending</option>
+              <option value="in-progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          
+          <Input
+            label="Due Date"
+            type="date"
+            value={formData.dueDate}
+            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            {task ? 'Update Task' : 'Add Task'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const ContentManagement = () => {
+  const { content, clients } = useContext(DataContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
+
+  const openModal = (content?: ContentPost) => {
+    setSelectedContent(content || null);
+    setIsModalOpen(true);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'posted': return 'success';
+      case 'approved': return 'primary';
+      case 'pending-approval': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Content Management</h1>
+        <Button onClick={() => openModal()}>
+          <Plus className="w-4 h-4" />
+          Create Content
+        </Button>
+      </div>
+
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {content.map((post) => {
+          const client = clients.find(c => c.id === post.clientId);
+          return (
+            <Card key={post.id} className="hover:shadow-md transition-shadow">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-gray-900">{post.platform}</span>
+                    <Badge variant={getStatusColor(post.status)}>
+                      {post.status}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600 line-clamp-3">{post.content}</p>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Client:</span>
+                    <span className="text-sm font-medium">{client?.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Scheduled:</span>
+                    <span className="text-sm font-medium">
+                      {new Date(post.scheduledDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <div className="flex space-x-2">
+                    {post.status === 'pending-approval' && (
+                      <>
+                        <Button variant="success" size="sm">
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                        <Button variant="danger" size="sm">
+                          <XCircle className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => openModal(post)}>
+                    Edit
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Content Modal */}
+      <ContentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        content={selectedContent}
+        onSave={() => {}}
+      />
+    </div>
+  );
+};
+
+const ContentModal = ({ isOpen, onClose, content, onSave }) => {
+  const { clients } = useContext(DataContext);
+  const [formData, setFormData] = useState({
+    clientId: '',
+    platform: '',
+    content: '',
+    scheduledDate: '',
+    status: 'draft' as const
+  });
+
+  useEffect(() => {
+    if (content) {
+      setFormData({
+        clientId: content.clientId,
+        platform: content.platform,
+        content: content.content,
+        scheduledDate: content.scheduledDate,
+        status: content.status
+      });
+    } else {
+      setFormData({
+        clientId: '',
+        platform: '',
+        content: '',
+        scheduledDate: '',
+        status: 'draft'
+      });
+    }
+  }, [content]);
+
+  const platforms = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Twitter'];
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={content ? 'Edit Content' : 'Create Content'}>
+      <form className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
+            <select
+              value={formData.clientId}
+              onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+            <select
+              value={formData.platform}
+              onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select Platform</option>
+              {platforms.map((platform) => (
+                <option key={platform} value={platform}>{platform}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+          <textarea
+            value={formData.content}
+            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+            rows={4}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder="Write your post content..."
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Scheduled Date"
+            type="datetime-local"
+            value={formData.scheduledDate}
+            onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
+            required
+          />
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="draft">Draft</option>
+              <option value="pending-approval">Pending Approval</option>
+              <option value="approved">Approved</option>
+              <option value="posted">Posted</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            {content ? 'Update Content' : 'Create Content'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Client Dashboard Components
+const ClientOverview = ({ user }) => {
+  const { performance, content, invoices } = useContext(DataContext);
+  
+  const clientPerformance = performance.find(p => p.clientId === user?.id);
+  const clientContent = content.filter(c => c.clientId === user?.id);
+  const clientInvoices = invoices.filter(i => i.clientId === user?.id);
+
+  const stats = [
+    { name: 'Total Followers', value: clientPerformance?.followers.toLocaleString() || '0', icon: Users, color: 'text-blue-600' },
+    { name: 'Engagement Rate', value: `${clientPerformance?.engagement || 0}%`, icon: TrendingUp, color: 'text-green-600' },
+    { name: 'Posts This Month', value: clientContent.length, icon: FileText, color: 'text-purple-600' },
+    { name: 'Reach', value: clientPerformance?.reach?.toLocaleString() || '0', icon: Target, color: 'text-orange-600' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.name}!</h1>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat) => (
+          <Card key={stat.name} className="hover:shadow-md transition-shadow">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <stat.icon className={`w-8 h-8 ${stat.color}`} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card title="Recent Content">
+          <div className="space-y-4">
+            {clientContent.slice(0, 5).map((post) => (
+              <div key={post.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">{post.platform}</p>
+                  <p className="text-sm text-gray-600 truncate">{post.content}</p>
+                </div>
+                <Badge variant={
+                  post.status === 'posted' ? 'success' :
+                  post.status === 'approved' ? 'primary' :
+                  post.status === 'pending-approval' ? 'warning' : 'default'
+                }>
+                  {post.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="Payment History">
+          <div className="space-y-4">
+            {clientInvoices.slice(0, 5).map((invoice) => (
+              <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">#{invoice.invoiceNumber}</p>
+                  <p className="text-sm text-gray-600">{new Date(invoice.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-gray-900">${invoice.amount}</p>
+                  <Badge variant={
+                    invoice.status === 'paid' ? 'success' :
+                    invoice.status === 'overdue' ? 'danger' : 'warning'
+                  }>
+                    {invoice.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// Main App Components
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const api = new ApiService();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const userData = await api.getCurrentUser();
+          setUser(userData);
+        } catch (error) {
+          localStorage.removeItem('auth_token');
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const userData = await api.login(email, password);
+      setUser(userData);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const register = async (userData: any): Promise<boolean> => {
+    try {
+      const newUser = await api.register(userData);
+      setUser(newUser);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (error) {
+      // Handle error
+    } finally {
+      setUser(null);
+      localStorage.removeItem('auth_token');
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+const DataProvider = ({ children }) => {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [content, setContent] = useState<ContentPost[]>([]);
+  const [performance, setPerformance] = useState<PerformanceData[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const api = new ApiService();
+
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const [
+        clientsData,
+        tasksData,
+        contentData,
+        performanceData,
+        messagesData,
+        invoicesData
+      ] = await Promise.all([
+        api.getClients(),
+        api.getTasks(),
+        api.getContent(),
+        api.getPerformanceData(),
+        api.getMessages(),
+        api.getInvoices()
+      ]);
+
+      setClients(clientsData);
+      setTasks(tasksData);
+      setContent(contentData);
+      setPerformance(performanceData);
+      setMessages(messagesData);
+      setInvoices(invoicesData);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  return (
+    <DataContext.Provider value={{
+      clients,
+      tasks,
+      content,
+      performance,
+      messages,
+      invoices,
+      refreshData,
+      loading
+    }}>
+      {children}
+    </DataContext.Provider>
+  );
+};
+
+const Dashboard = () => {
+  const { user } = useContext(AuthContext);
+  const [currentView, setCurrentView] = useState('overview');
+
+  const renderAdminView = () => {
+    switch (currentView) {
+      case 'clients':
+        return <ClientManagement />;
+      case 'tasks':
+        return <TaskManagement />;
+      case 'content':
+        return <ContentManagement />;
+      case 'performance':
+        return <PerformanceManagement />;
+      case 'messages':
+        return <MessageCenter />;
+      case 'invoices':
+        return <InvoiceManagement />;
+      default:
+        return <AdminOverview />;
+    }
+  };
+
+  const renderClientView = () => {
+    switch (currentView) {
+      case 'content':
+        return <ClientContent user={user} />;
+      case 'performance':
+        return <ClientPerformance user={user} />;
+      case 'messages':
+        return <ClientMessages user={user} />;
+      case 'billing':
+        return <ClientBilling user={user} />;
+      default:
+        return <ClientOverview user={user} />;
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') || 'overview';
+      setCurrentView(hash);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  return (
+    <DashboardLayout user={user} onLogout={() => {}}>
+      {user?.role === 'admin' ? renderAdminView() : renderClientView()}
+    </DashboardLayout>
+  );
+};
+
+// Additional Admin Components
+const PerformanceManagement = () => {
+  const { performance, clients } = useContext(DataContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Performance Management</h1>
+        <Button onClick={() => setIsModalOpen(true)}>
+          <Plus className="w-4 h-4" />
+          Add Performance Data
+        </Button>
+      </div>
+
+      {/* Performance Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {clients.map((client) => {
+          const clientPerf = performance.find(p => p.clientId === client.id);
+          return (
+            <Card key={client.id} title={client.name}>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {clientPerf?.followers.toLocaleString() || '0'}
+                  </p>
+                  <p className="text-sm text-gray-600">Followers</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-600">
+                    {clientPerf?.engagement || 0}%
+                  </p>
+                  <p className="text-sm text-gray-600">Engagement</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-purple-600">
+                    {clientPerf?.reach?.toLocaleString() || '0'}
+                  </p>
+                  <p className="text-sm text-gray-600">Reach</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-orange-600">
+                    {clientPerf?.clicks?.toLocaleString() || '0'}
+                  </p>
+                  <p className="text-sm text-gray-600">Clicks</p>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Performance Input Modal */}
+      <PerformanceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={() => {}}
+      />
+    </div>
+  );
+};
+
+const PerformanceModal = ({ isOpen, onClose, onSave }) => {
+  const { clients } = useContext(DataContext);
+  const [formData, setFormData] = useState({
+    clientId: '',
+    month: '',
+    followers: 0,
+    engagement: 0,
+    reach: 0,
+    clicks: 0,
+    impressions: 0,
+    growthRate: 0
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const api = new ApiService();
+    
+    try {
+      await api.createPerformanceData(formData);
+      onSave();
+      onClose();
+    } catch (error) {
+      console.error('Failed to save performance data:', error);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Add Performance Data">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
+            <select
+              value={formData.clientId}
+              onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          <Input
+            label="Month"
+            type="month"
+            value={formData.month}
+            onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Input
+            label="Followers"
+            type="number"
+            value={formData.followers}
+            onChange={(e) => setFormData({ ...formData, followers: Number(e.target.value) })}
+          />
+          
+          <Input
+            label="Engagement %"
+            type="number"
+            step="0.01"
+            value={formData.engagement}
+            onChange={(e) => setFormData({ ...formData, engagement: Number(e.target.value) })}
+          />
+          
+          <Input
+            label="Growth Rate %"
+            type="number"
+            step="0.01"
+            value={formData.growthRate}
+            onChange={(e) => setFormData({ ...formData, growthRate: Number(e.target.value) })}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <Input
+            label="Reach"
+            type="number"
+            value={formData.reach}
+            onChange={(e) => setFormData({ ...formData, reach: Number(e.target.value) })}
+          />
+          
+          <Input
+            label="Clicks"
+            type="number"
+            value={formData.clicks}
+            onChange={(e) => setFormData({ ...formData, clicks: Number(e.target.value) })}
+          />
+          
+          <Input
+            label="Impressions"
+            type="number"
+            value={formData.impressions}
+            onChange={(e) => setFormData({ ...formData, impressions: Number(e.target.value) })}
+          />
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            Add Performance Data
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const MessageCenter = () => {
+  const { messages, clients } = useContext(DataContext);
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState('');
+
+  const sendMessage = async (receiverId: string, content: string) => {
+    const api = new ApiService();
+    try {
+      await api.sendMessage({ receiverId, content });
+      setNewMessage('');
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Message Center</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-96">
+        {/* Client List */}
+        <Card title="Clients" className="h-full">
+          <div className="space-y-2 overflow-y-auto">
+            {clients.map((client) => (
+              <div
+                key={client.id}
+                onClick={() => setSelectedChat(client.id)}
+                className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                  selectedChat === client.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{client.name}</p>
+                    <p className="text-sm text-gray-500">{client.company}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Chat Area */}
+        <div className="lg:col-span-2">
+          <Card title={selectedChat ? clients.find(c => c.id === selectedChat)?.name : 'Select a client'} className="h-full">
+            {selectedChat ? (
+              <div className="flex flex-col h-full">
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+                  {messages
+                    .filter(m => m.receiverId === selectedChat || m.senderId === selectedChat)
+                    .map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.senderId === selectedChat ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div className={`max-w-xs px-4 py-2 rounded-lg ${
+                        message.senderId === selectedChat 
+                          ? 'bg-gray-100 text-gray-900' 
+                          : 'bg-blue-600 text-white'
+                      }`}>
+                        <p>{message.content}</p>
+                        <p className="text-xs mt-1 opacity-75">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Message Input */}
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && newMessage.trim()) {
+                        sendMessage(selectedChat, newMessage.trim());
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={() => {
+                      if (newMessage.trim()) {
+                        sendMessage(selectedChat, newMessage.trim());
+                      }
+                    }}
+                  >
+                    Send
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                Select a client to start messaging
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const InvoiceManagement = () => {
+  const { invoices, clients } = useContext(DataContext);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Invoice Management</h1>
+        <Button onClick={() => setIsModalOpen(true)}>
+          <Plus className="w-4 h-4" />
+          Create Invoice
+        </Button>
+      </div>
+
+      {/* Invoices Table */}
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {invoices.map((invoice) => {
+                const client = clients.find(c => c.id === invoice.clientId);
+                return (
+                  <tr key={invoice.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      #{invoice.invoiceNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {client?.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${invoice.amount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(invoice.dueDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge variant={
+                        invoice.status === 'paid' ? 'success' :
+                        invoice.status === 'overdue' ? 'danger' : 'warning'
+                      }>
+                        {invoice.status}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      <Button variant="outline" size="sm">
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                      {invoice.status !== 'paid' && (
+                        <Button variant="success" size="sm">
+                          Mark Paid
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Invoice Modal */}
+      <InvoiceModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={() => {}}
+      />
+    </div>
+  );
+};
+
+const InvoiceModal = ({ isOpen, onClose, onSave }) => {
+  const { clients } = useContext(DataContext);
+  const [formData, setFormData] = useState({
+    clientId: '',
+    amount: 0,
+    dueDate: '',
+    invoiceNumber: `INV-${Date.now()}`
+  });
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Create Invoice">
+      <form className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
+            <select
+              value={formData.clientId}
+              onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+          
+          <Input
+            label="Invoice Number"
+            value={formData.invoiceNumber}
+            onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Amount"
+            type="number"
+            step="0.01"
+            value={formData.amount}
+            onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+            required
+          />
+          
+          <Input
+            label="Due Date"
+            type="date"
+            value={formData.dueDate}
+            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            required
+          />
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            Create Invoice
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Client Components
+const ClientContent = ({ user }) => {
+  const { content } = useContext(DataContext);
+  const clientContent = content.filter(c => c.clientId === user?.id);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Your Content</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {clientContent.map((post) => (
+          <Card key={post.id} className="hover:shadow-md transition-shadow">
+            <div className="space-y-3">
+              <div className="flex items-start justify-between">
+                <span className="text-sm font-medium text-gray-900">{post.platform}</span>
+                <Badge variant={
+                  post.status === 'posted' ? 'success' :
+                  post.status === 'approved' ? 'primary' :
+                  post.status === 'pending-approval' ? 'warning' : 'default'
+                }>
+                  {post.status}
+                </Badge>
+              </div>
+              
+              <p className="text-sm text-gray-600 line-clamp-3">{post.content}</p>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Scheduled:</span>
+                  <span className="text-sm font-medium">
+                    {new Date(post.scheduledDate).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              
+              {post.status === 'pending-approval' && (
+                <div className="flex space-x-2 pt-3 border-t">
+                  <Button variant="success" size="sm" className="flex-1">
+                    <CheckCircle className="w-4 h-4" />
+                    Approve
+                  </Button>
+                  <Button variant="danger" size="sm" className="flex-1">
+                    <XCircle className="w-4 h-4" />
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ClientPerformance = ({ user }) => {
+  const { performance } = useContext(DataContext);
+  const clientPerf = performance.find(p => p.clientId === user?.id);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Your Performance</h1>
+      
+      {clientPerf ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="text-center">
+            <Users className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+            <p className="text-3xl font-bold text-gray-900">{clientPerf.followers.toLocaleString()}</p>
+            <p className="text-gray-600">Total Followers</p>
+          </Card>
+          
+          <Card className="text-center">
+            <TrendingUp className="w-12 h-12 text-green-600 mx-auto mb-4" />
+            <p className="text-3xl font-bold text-gray-900">{clientPerf.engagement}%</p>
+            <p className="text-gray-600">Engagement Rate</p>
+          </Card>
+          
+          <Card className="text-center">
+            <Target className="w-12 h-12 text-purple-600 mx-auto mb-4" />
+            <p className="text-3xl font-bold text-gray-900">{clientPerf.reach.toLocaleString()}</p>
+            <p className="text-gray-600">Monthly Reach</p>
+          </Card>
+          
+          <Card className="text-center">
+            <BarChart3 className="w-12 h-12 text-orange-600 mx-auto mb-4" />
+            <p className="text-3xl font-bold text-gray-900">{clientPerf.growthRate}%</p>
+            <p className="text-gray-600">Growth Rate</p>
+          </Card>
+        </div>
+      ) : (
+        <Card className="text-center py-12">
+          <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Performance Data</h3>
+          <p className="text-gray-600">Performance data will appear here once available.</p>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+const ClientMessages = ({ user }) => {
+  const { messages } = useContext(DataContext);
+  const [newMessage, setNewMessage] = useState('');
+  const userMessages = messages.filter(m => m.senderId === user?.id || m.receiverId === user?.id);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Messages</h1>
+      
+      <Card className="h-96">
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+            {userMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`max-w-xs px-4 py-2 rounded-lg ${
+                  message.senderId === user?.id 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-100 text-gray-900'
+                }`}>
+                  <p>{message.content}</p>
+                  <p className="text-xs mt-1 opacity-75">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+            <Button>Send</Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+const ClientBilling = ({ user }) => {
+  const { invoices, clients } = useContext(DataContext);
+  const client = clients.find(c => c.id === user?.id);
+  const clientInvoices = invoices.filter(i => i.clientId === user?.id);
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-900">Billing & Payments</h1>
+      
+      {/* Package Info */}
+      {client && (
+        <Card title="Current Package">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Package</p>
+              <p className="font-semibold">{client.package}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Monthly Fee</p>
+              <p className="font-semibold">${client.monthlyFee}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Next Payment</p>
+              <p className="font-semibold">{new Date(client.nextPayment).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Status</p>
+              <Badge variant={client.paymentStatus === 'paid' ? 'success' : 'warning'}>
+                {client.paymentStatus}
+              </Badge>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Invoice History */}
+      <Card title="Payment History">
+        <div className="space-y-3">
+          {clientInvoices.map((invoice) => (
+            <div key={invoice.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium">#{invoice.invoiceNumber}</p>
+                <p className="text-sm text-gray-600">{new Date(invoice.createdAt).toLocaleDateString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold">${invoice.amount}</p>
+                <Badge variant={
+                  invoice.status === 'paid' ? 'success' :
+                  invoice.status === 'overdue' ? 'danger' : 'warning'
+                }>
+                  {invoice.status}
+                </Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// Main App
+const App = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const { user, loading } = useContext(AuthContext);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthForm
+        isLogin={isLogin}
+        onToggle={() => setIsLogin(!isLogin)}
+        onSuccess={() => window.location.reload()}
+      />
+    );
+  }
+
+  return (
+    <DataProvider>
+      <Dashboard />
+    </DataProvider>
+  );
+};
+
+// Export wrapped in providers
+export default function SMMAPro() {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  );
+}
