@@ -2,21 +2,22 @@
 import React from 'react';
 import { DollarSign, Users, Clock, AlertCircle } from 'lucide-react';
 import { Card, Badge } from '../../components/ui';
-import { useData } from '../../contexts/DataContext';
+import { useData } from '../../context/DataContext';
+import type { Invoice, Client, Task } from '../../types';
 
 const AdminOverview: React.FC = () => {
   const { clients, tasks, invoices } = useData();
   
   const totalRevenue = invoices
-    .filter(inv => inv.status === 'paid')
-    .reduce((sum, inv) => sum + inv.amount, 0);
+    .filter((inv: Invoice) => inv.status === 'paid')
+    .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0);
   
-  const activeClients = clients.filter(c => c.status === 'active').length;
-  const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in-progress').length;
-  const overduePayments = invoices.filter(inv => inv.status === 'overdue').length;
+  const activeClients = clients.filter((c: Client) => c.status === 'active').length;
+  const pendingTasks = tasks.filter((t: Task) => t.status === 'pending' || t.status === 'in-progress').length;
+  const overduePayments = invoices.filter((inv: Invoice) => inv.status === 'overdue').length;
 
   const stats = [
-    { name: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-green-600' },
+    { name: 'Total Revenue', value: `${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-green-600' },
     { name: 'Active Clients', value: activeClients, icon: Users, color: 'text-blue-600' },
     { name: 'Pending Tasks', value: pendingTasks, icon: Clock, color: 'text-yellow-600' },
     { name: 'Overdue Payments', value: overduePayments, icon: AlertCircle, color: 'text-red-600' }
@@ -47,7 +48,7 @@ const AdminOverview: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Recent Tasks">
           <div className="space-y-4">
-            {tasks.slice(0, 5).map((task) => (
+            {tasks.slice(0, 5).map((task: Task) => (
               <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{task.title}</p>
@@ -67,7 +68,7 @@ const AdminOverview: React.FC = () => {
 
         <Card title="Client Status">
           <div className="space-y-4">
-            {clients.slice(0, 5).map((client) => (
+            {clients.slice(0, 5).map((client: Client) => (
               <div key={client.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{client.name}</p>

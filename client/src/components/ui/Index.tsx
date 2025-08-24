@@ -1,7 +1,7 @@
 // components/ui/index.tsx - Reusable UI Components
 import React from 'react';
 import { X } from 'lucide-react';
-import { ButtonProps, CardProps, InputProps, ModalProps, BadgeVariant } from '../../types';
+import type { ButtonProps, CardProps, InputProps, ModalProps, BadgeVariant } from '../../types';
 
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',

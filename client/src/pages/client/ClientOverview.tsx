@@ -2,16 +2,17 @@
 import React from 'react';
 import { Users, TrendingUp, FileText, Target } from 'lucide-react';
 import { Card, Badge } from '../../components/ui';
-import { useData } from '../../contexts/DataContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
+import type { PerformanceData, ContentPost, Invoice } from '../../types';
 
 const ClientOverview: React.FC = () => {
   const { performance, content, invoices } = useData();
   const { user } = useAuth();
   
-  const clientPerformance = performance.find(p => p.clientId === user?.id);
-  const clientContent = content.filter(c => c.clientId === user?.id);
-  const clientInvoices = invoices.filter(i => i.clientId === user?.id);
+  const clientPerformance = performance.find((p: PerformanceData) => p.clientId === user?.id);
+  const clientContent = content.filter((c: ContentPost) => c.clientId === user?.id);
+  const clientInvoices = invoices.filter((i: Invoice) => i.clientId === user?.id);
 
   const stats = [
     { name: 'Total Followers', value: clientPerformance?.followers.toLocaleString() || '0', icon: Users, color: 'text-blue-600' },
@@ -45,7 +46,7 @@ const ClientOverview: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Recent Content">
           <div className="space-y-4">
-            {clientContent.slice(0, 5).map((post) => (
+            {clientContent.slice(0, 5).map((post: ContentPost) => (
               <div key={post.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">{post.platform}</p>
@@ -65,7 +66,7 @@ const ClientOverview: React.FC = () => {
 
         <Card title="Payment History">
           <div className="space-y-4">
-            {clientInvoices.slice(0, 5).map((invoice) => (
+            {clientInvoices.slice(0, 5).map((invoice: Invoice) => (
               <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="font-medium text-gray-900">#{invoice.invoiceNumber}</p>

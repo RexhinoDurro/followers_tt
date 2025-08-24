@@ -1,6 +1,7 @@
 // contexts/DataContext.tsx - Data Management Context
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { 
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { 
   Client, 
   Task, 
   ContentPost, 

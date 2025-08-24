@@ -15,7 +15,7 @@ import {
   Menu, 
   X 
 } from 'lucide-react';
-import { AuthUser } from '../../types';
+import type { AuthUser } from '../../types';
 import { Button } from '../ui';
 
 interface DashboardLayoutProps {

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface AuthFormProps {
   isLogin: boolean;

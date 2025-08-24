@@ -1,6 +1,7 @@
 // contexts/AuthContext.tsx - Authentication Context
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AuthUser } from '../types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { AuthUser } from '../types';
 import { ApiService } from '../pages/services/ApiService';
 
 interface AuthContextType {

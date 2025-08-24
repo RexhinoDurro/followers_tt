@@ -1,27 +1,27 @@
 // App.tsx - Main Router Component
 import React, { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { DataProvider } from './contexts/DataContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataProvider } from './context/DataContext';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { AuthForm } from './pages/auth/AuthForm';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
-// Admin Pages
-import AdminOverview from './pages/admin/AdminOverview';
-import ClientManagement from './pages/admin/ClientManagement';
-import TaskManagement from './pages/admin/TaskManagement';
-import ContentManagement from './pages/admin/ContentManagement';
-import PerformanceManagement from './pages/admin/PerformanceManagement';
-import MessageCenter from './pages/admin/MessageCenter';
-import InvoiceManagement from './pages/admin/InvoiceManagement';
-import Settings from './pages/admin/Settings';
+// Admin Pages (Create placeholder components for now)
+const AdminOverview = React.lazy(() => import('./pages/admin/AdminOverview'));
+const ClientManagement = () => <div>Client Management Page</div>;
+const TaskManagement = () => <div>Task Management Page</div>;
+const ContentManagement = () => <div>Content Management Page</div>;
+const PerformanceManagement = () => <div>Performance Management Page</div>;
+const MessageCenter = () => <div>Message Center Page</div>;
+const InvoiceManagement = () => <div>Invoice Management Page</div>;
+const Settings = () => <div>Settings Page</div>;
 
-// Client Pages
-import ClientOverview from './pages/client/ClientOverview';
-import ClientContent from './pages/client/ClientContent';
-import ClientPerformance from './pages/client/ClientPerformance';
-import ClientMessages from './pages/client/ClientMessages';
-import ClientBilling from './pages/client/ClientBilling';
+// Client Pages (Create placeholder components for now)
+const ClientOverview = React.lazy(() => import('./pages/client/ClientOverview'));
+const ClientContent = () => <div>Client Content Page</div>;
+const ClientPerformance = () => <div>Client Performance Page</div>;
+const ClientMessages = () => <div>Client Messages Page</div>;
+const ClientBilling = () => <div>Client Billing Page</div>;
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useAuth();
@@ -71,7 +71,11 @@ const AppContent: React.FC = () => {
       case 'settings':
         return <Settings />;
       default:
-        return <AdminOverview />;
+        return (
+          <React.Suspense fallback={<LoadingSpinner />}>
+            <AdminOverview />
+          </React.Suspense>
+        );
     }
   };
 
@@ -86,7 +90,11 @@ const AppContent: React.FC = () => {
       case 'billing':
         return <ClientBilling />;
       default:
-        return <ClientOverview />;
+        return (
+          <React.Suspense fallback={<LoadingSpinner />}>
+            <ClientOverview />
+          </React.Suspense>
+        );
     }
   };
 
