@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'django_filters',
+  # ✅ Fixed: changed from 'django_filters' to 'django_filter'
     
     # Local apps
     'api',
@@ -137,7 +137,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
+        
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
@@ -146,8 +146,10 @@ REST_FRAMEWORK = {
     ],
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S.%fZ',
     'DATE_FORMAT': '%Y-%m-%d',
-    'TIME_FORMAT': '%H:%M:%S',
-}
+        'TIME_FORMAT': '%H:%M:%S',
+    }
+
+
 
 # CORS settings for React frontend
 CORS_ALLOWED_ORIGINS = [

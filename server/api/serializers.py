@@ -1,7 +1,7 @@
 # File: server/api/serializers.py
 # Django REST Framework Serializers for SMMA Dashboard
 
-from datetime import timezone
+from django.utils import timezone 
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import (
