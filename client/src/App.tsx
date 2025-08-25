@@ -11,6 +11,7 @@ import ClientOverview from './pages/client/ClientOverview';
 import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
 import HowItWorksPage from './pages/HowItWorksPage';
+import PricingPage from './pages/PricingPage';
 
 function App() {
   return (
@@ -23,7 +24,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             
             {/* Pages with placeholder components */}
-            <Route path="/pricing" element={<PlaceholderPage title="Pricing Plans" />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/about" element={<AboutUs />} />
