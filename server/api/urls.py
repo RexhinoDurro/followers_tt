@@ -1,6 +1,5 @@
-# File: server/api/urls.py
-# URL Configuration for SMMA Dashboard API
-
+# server/api/urls.py - Updated with OAuth endpoints
+from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
@@ -13,13 +12,21 @@ from .views import (
     # ViewSets
     ClientViewSet, TaskViewSet, ContentPostViewSet,
     PerformanceDataViewSet, MessageViewSet, InvoiceViewSet,
-    FileViewSet, NotificationViewSet,
+    FileViewSet, NotificationViewSet, SocialMediaAccountViewSet,
     
     # Analytics views
     analytics_overview, client_performance_report,
     
     # Health check
     health_check
+)
+
+# OAuth views
+from .views.oauth_views import (
+    initiate_instagram_oauth, handle_instagram_callback,
+    initiate_youtube_oauth, handle_youtube_callback,
+    get_connected_accounts, disconnect_account,
+    trigger_manual_sync, get_sync_status
 )
 
 # Create router and register viewsets
@@ -32,6 +39,7 @@ router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'files', FileViewSet, basename='file')
 router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'social-accounts', SocialMediaAccountViewSet, basename='social-account')
 
 urlpatterns = [
     # Authentication endpoints
@@ -40,9 +48,24 @@ urlpatterns = [
     path('auth/logout/', logout_view, name='logout'),
     path('auth/me/', current_user_view, name='current_user'),
     
+    # OAuth endpoints
+    path('oauth/instagram/initiate/', initiate_instagram_oauth, name='instagram_oauth_initiate'),
+    path('oauth/instagram/callback/', handle_instagram_callback, name='instagram_oauth_callback'),
+    path('oauth/youtube/initiate/', initiate_youtube_oauth, name='youtube_oauth_initiate'),
+    path('oauth/youtube/callback/', handle_youtube_callback, name='youtube_oauth_callback'),
+    
+    # Social media account management
+    path('social-accounts/', get_connected_accounts, name='connected_accounts'),
+    path('social-accounts/<uuid:account_id>/disconnect/', disconnect_account, name='disconnect_account'),
+    path('social-accounts/<uuid:account_id>/sync/', trigger_manual_sync, name='trigger_sync'),
+    path('social-accounts/<uuid:account_id>/status/', get_sync_status, name='sync_status'),
+    
     # Dashboard statistics
     path('dashboard/stats/', dashboard_stats_view, name='dashboard_stats'),
     path('dashboard/client-stats/', client_dashboard_stats_view, name='client_dashboard_stats'),
+    
+    # Real-time metrics endpoints
+    path('metrics/realtime/', lambda request: JsonResponse({'message': 'Real-time metrics endpoint'}), name='realtime_metrics'),
     
     # Analytics and reporting
     path('analytics/overview/', analytics_overview, name='analytics_overview'),

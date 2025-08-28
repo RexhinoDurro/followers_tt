@@ -1,20 +1,19 @@
-# File: server/server/settings.py
-# Django Settings for SMMA Dashboard
-
+# server/server/settings.py - Updated with social media API configuration
 from pathlib import Path
 import os
 from datetime import timedelta
+from decouple import config  # pip install python-decouple
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-8c4af#h&cz1xh78%w_%aw%9z(z$40_06xp01%lq$!$n915r9)h'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-8c4af#h&cz1xh78%w_%aw%9z(z$40_06xp01%lq$!$n915r9)h')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0', cast=lambda v: [s.strip() for s in v.split(',')])
 
 # Application definition
 INSTALLED_APPS = [
@@ -29,7 +28,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-  # ✅ Fixed: changed from 'django_filters' to 'django_filter'
+    'celery',
     
     # Local apps
     'api',
@@ -78,11 +77,11 @@ DATABASES = {
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.environ.get('DB_NAME', 'smma_dashboard'),
-#         'USER': os.environ.get('DB_USER', 'postgres'),
-#         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-#         'HOST': os.environ.get('DB_HOST', 'localhost'),
-#         'PORT': os.environ.get('DB_PORT', '5432'),
+#         'NAME': config('DB_NAME', default='smma_dashboard'),
+#         'USER': config('DB_USER', default='postgres'),
+#         'PASSWORD': config('DB_PASSWORD', default=''),
+#         'HOST': config('DB_HOST', default='localhost'),
+#         'PORT': config('DB_PORT', default='5432'),
 #     }
 # }
 
@@ -137,7 +136,6 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_FILTER_BACKENDS': [
-        
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
@@ -146,10 +144,8 @@ REST_FRAMEWORK = {
     ],
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S.%fZ',
     'DATE_FORMAT': '%Y-%m-%d',
-        'TIME_FORMAT': '%H:%M:%S',
-    }
-
-
+    'TIME_FORMAT': '%H:%M:%S',
+}
 
 # CORS settings for React frontend
 CORS_ALLOWED_ORIGINS = [
@@ -173,18 +169,108 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+# Frontend URL for OAuth redirects
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
+# Social Media API Configuration
+# Instagram/Facebook API
+INSTAGRAM_CLIENT_ID = config('INSTAGRAM_CLIENT_ID', default='')
+INSTAGRAM_CLIENT_SECRET = config('INSTAGRAM_CLIENT_SECRET', default='')
+FACEBOOK_APP_ID = config('FACEBOOK_APP_ID', default='')
+FACEBOOK_APP_SECRET = config('FACEBOOK_APP_SECRET', default='')
+
+# Google/YouTube API
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
+
+# TikTok API (when available)
+TIKTOK_CLIENT_KEY = config('TIKTOK_CLIENT_KEY', default='')
+TIKTOK_CLIENT_SECRET = config('TIKTOK_CLIENT_SECRET', default='')
+
+# Twitter API
+TWITTER_API_KEY = config('TWITTER_API_KEY', default='')
+TWITTER_API_SECRET = config('TWITTER_API_SECRET', default='')
+TWITTER_BEARER_TOKEN = config('TWITTER_BEARER_TOKEN', default='')
+
+# LinkedIn API
+LINKEDIN_CLIENT_ID = config('LINKEDIN_CLIENT_ID', default='')
+LINKEDIN_CLIENT_SECRET = config('LINKEDIN_CLIENT_SECRET', default='')
+
+# Encryption key for storing access tokens
+ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='your-32-character-encryption-key-here')
+
+# Celery Configuration
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
+
+# Celery Beat Schedule for periodic tasks
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Sync all social media data every 4 hours
+    'sync-all-data': {
+        'task': 'api.tasks.sync_all_client_data',
+        'schedule': crontab(minute=0, hour='*/4'),
+    },
+    # Clean up old metrics weekly
+    'cleanup-old-metrics': {
+        'task': 'api.tasks.cleanup_old_metrics',
+        'schedule': crontab(minute=0, hour=2, day_of_week=0),  # Sunday at 2 AM
+    },
+    # Generate weekly reports
+    'generate-weekly-reports': {
+        'task': 'api.tasks.generate_weekly_reports',
+        'schedule': crontab(minute=0, hour=9, day_of_week=1),  # Monday at 9 AM
+    },
+    # Update monthly performance data daily
+    'update-monthly-performance': {
+        'task': 'api.tasks.update_all_monthly_performance',
+        'schedule': crontab(minute=30, hour=1),  # Daily at 1:30 AM
+    },
+}
+
+# Cache configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'smma_cache',
+        'TIMEOUT': 300,  # 5 minutes default timeout
+    }
+}
+
+# Use local memory cache for development
+if DEBUG:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
+        }
+    }
+
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# Email settings (for production)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Development
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Production
-# EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-# EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-# EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+# Email settings
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+if not DEBUG:
+    EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+    DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@yoursmma.com')
 
 # Logging configuration
 LOGGING = {
@@ -212,23 +298,34 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'celery': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'celery.log',
+            'formatter': 'verbose',
+        },
     },
-    'root': {
-        'handlers': ['console', 'file'],
-        'level': 'INFO',
+    'loggers': {
+        'django': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'api': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'celery': {
+            'handlers': ['celery', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }
 
 # Create logs directory if it doesn't exist
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
-
-# Cache configuration (for production use Redis)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-    }
-}
 
 # Session settings
 SESSION_COOKIE_AGE = 86400  # 24 hours
@@ -255,3 +352,41 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = 'DENY'
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# API Rate Limiting
+API_RATE_LIMITS = {
+    'instagram': {
+        'calls_per_hour': 200,
+        'calls_per_day': 4800,
+    },
+    'youtube': {
+        'calls_per_day': 10000,
+    },
+    'tiktok': {
+        'calls_per_day': 1000,
+    }
+}
+
+# Data retention settings
+DATA_RETENTION_DAYS = {
+    'metrics': 365,  # Keep metrics for 1 year
+    'post_metrics': 180,  # Keep post metrics for 6 months
+    'sync_logs': 90,  # Keep sync logs for 3 months
+}
+
+# Webhook settings for real-time updates (if supported by platforms)
+WEBHOOK_SECRET = config('WEBHOOK_SECRET', default='your-webhook-secret-key')
+WEBHOOK_VERIFY_TOKEN = config('WEBHOOK_VERIFY_TOKEN', default='your-verify-token')
+
+# Feature flags
+FEATURES = {
+    'ENABLE_INSTAGRAM': True,
+    'ENABLE_YOUTUBE': True,
+    'ENABLE_TIKTOK': False,  # Enable when TikTok API is available
+    'ENABLE_TWITTER': False,
+    'ENABLE_LINKEDIN': False,
+    'ENABLE_WEBHOOKS': False,
+    'ENABLE_REAL_TIME_UPDATES': True,
+}
