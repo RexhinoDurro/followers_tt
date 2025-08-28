@@ -1,11 +1,14 @@
-// types/index.ts - All type definitions
+// client/src/types/index.ts - Updated AuthUser type to match backend
 export interface AuthUser {
   id: string;
   email: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   role: 'admin' | 'client';
-  avatar?: string;
   company?: string;
+  avatar?: string;
+  // Computed property for full name
+  name?: string;
 }
 
 export interface Client {
@@ -14,78 +17,114 @@ export interface Client {
   email: string;
   company: string;
   package: string;
-  monthlyFee: number;
-  startDate: string;
+  monthly_fee: number;
+  start_date: string;
   status: 'active' | 'pending' | 'paused';
-  paymentStatus: 'paid' | 'overdue' | 'pending';
+  payment_status: 'paid' | 'overdue' | 'pending';
   platforms: string[];
-  accountManager: string;
-  nextPayment: string;
-  totalSpent: number;
+  account_manager: string;
+  next_payment: string;
+  total_spent: number;
 }
 
 export interface Task {
   id: string;
   title: string;
-  clientId: string;
-  assignedTo: string;
+  client_name: string;
+  assigned_to: string;
   status: 'pending' | 'in-progress' | 'review' | 'completed';
   priority: 'low' | 'medium' | 'high';
-  dueDate: string;
+  due_date: string;
   description: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface ContentPost {
   id: string;
-  clientId: string;
+  client_name: string;
   platform: string;
   content: string;
-  scheduledDate: string;
+  scheduled_date: string;
   status: 'draft' | 'pending-approval' | 'approved' | 'posted';
-  imageUrl?: string;
-  engagementRate?: number;
+  image_url?: string;
+  engagement_rate?: number;
 }
 
 export interface PerformanceData {
   id: string;
-  clientId: string;
+  client_name: string;
   month: string;
   followers: number;
   engagement: number;
   reach: number;
   clicks: number;
   impressions: number;
-  growthRate: number;
+  growth_rate: number;
 }
 
 export interface Message {
   id: string;
-  senderId: string;
-  receiverId: string;
+  sender_name: string;
+  receiver_name: string;
   content: string;
-  timestamp: string;
   read: boolean;
+  timestamp: string;
 }
 
 export interface Invoice {
   id: string;
-  clientId: string;
+  client_name: string;
+  invoice_number: string;
   amount: number;
-  dueDate: string;
+  due_date: string;
   status: 'paid' | 'pending' | 'overdue';
-  invoiceNumber: string;
-  createdAt: string;
+  created_at: string;
+}
+
+// Service-related types
+export interface Service {
+  id: string;
+  name: string;
+  platform: 'instagram' | 'tiktok' | 'youtube';
+  type: 'followers' | 'likes' | 'comments' | 'views' | 'shares' | 'subscribers';
+  description: string;
+  icon: string;
+  minQuantity: number;
+  maxQuantity: number;
+  basePrice: number;
+  features: string[];
+}
+
+export interface ServiceCategory {
+  platform: string;
+  name: string;
+  icon: string;
+  color: string;
+  gradient: string;
+  services: Service[];
+}
+
+export interface Package {
+  id: string;
+  serviceId: string;
+  name: string;
+  quantity: number;
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  popular?: boolean;
+  features: string[];
+  deliveryTime: string;
+  guarantee: string;
 }
 
 export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'primary';
 
-export interface ButtonProps {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
   className?: string;
-  [key: string]: any;
 }
 
 export interface CardProps {

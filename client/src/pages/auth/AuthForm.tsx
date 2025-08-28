@@ -1,7 +1,7 @@
-// pages/auth/AuthForm.tsx - Authentication Form
-// pages/auth/AuthForm.tsx - Fixed version with working authentication
+// client/src/pages/auth/AuthForm.tsx - Updated with Backend Integration
 import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { Button, Input } from '../../components/ui';
 
 interface AuthFormProps {
@@ -11,6 +11,7 @@ interface AuthFormProps {
 }
 
 export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess }) => {
+  const { login, register, loading, error } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -19,74 +20,47 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
     role: 'client' as 'admin' | 'client'
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setFormError('');
+
+    // Basic validation
+    if (!formData.email || !formData.password) {
+      setFormError('Email and password are required');
+      return;
+    }
+
+    if (!isLogin && !formData.name) {
+      setFormError('Name is required for registration');
+      return;
+    }
 
     try {
-      // Basic validation
-      if (!formData.email || !formData.password) {
-        setError('Email and password are required');
-        setLoading(false);
-        return;
-      }
-
-      if (!isLogin && !formData.name) {
-        setError('Name is required for registration');
-        setLoading(false);
-        return;
-      }
-
-      // Simulate authentication delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      let success = false;
 
       if (isLogin) {
-        // For demo purposes, accept any email/password combination
-        // In a real app, you'd validate against your backend
-        console.log('Login attempt:', { email: formData.email, password: formData.password });
-        
-        // Store user data in localStorage for demo (in real app, use proper auth context)
-        const userData = {
-          email: formData.email,
-          role: formData.email.includes('admin') ? 'admin' : 'client',
-          name: formData.email.split('@')[0],
-          company: 'Demo Company'
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        // Call success callback to redirect to dashboard
-        onSuccess();
-        
+        success = await login(formData.email, formData.password);
       } else {
-        // Registration
-        console.log('Registration attempt:', formData);
-        
-        // Store user data
-        const userData = {
+        success = await register({
           email: formData.email,
-          role: formData.role,
+          password: formData.password,
           name: formData.name,
-          company: formData.company || 'No Company'
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        // Call success callback to redirect to dashboard
+          role: formData.role,
+          company: formData.company || undefined,
+        });
+      }
+
+      if (success) {
         onSuccess();
       }
-      
     } catch (err) {
       console.error('Auth error:', err);
-      setError('Authentication failed. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
+
+  const displayError = formError || error;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 py-12 px-4">
@@ -100,18 +74,10 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
           </p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {/* Demo credentials info */}
-        {isLogin && (
-          <div className="mb-4 p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg text-sm">
-            <p className="font-semibold">Demo Mode:</p>
-            <p>Use any email/password to login</p>
-            <p>Use email with "admin" for admin access</p>
+        {displayError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start">
+            <AlertCircle className="w-5 h-5 mt-0.5 mr-2 flex-shrink-0" />
+            <span className="text-sm">{displayError}</span>
           </div>
         )}
 
@@ -125,6 +91,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 placeholder="Enter your full name"
+                disabled={loading}
               />
               
               <Input
@@ -133,17 +100,21 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                 value={formData.company}
                 onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                 placeholder="Your company name"
+                disabled={loading}
               />
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Account Type
+                </label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'client' })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
-                  <option value="client">Client</option>
-                  <option value="admin">Admin</option>
+                  <option value="client">Client - I need social media growth</option>
+                  <option value="admin">Agency Admin - I manage client accounts</option>
                 </select>
               </div>
             </>
@@ -156,6 +127,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
             placeholder="Enter your email"
+            disabled={loading}
           />
 
           <div className="relative">
@@ -166,19 +138,28 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
               placeholder="Enter your password"
+              disabled={loading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-9 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-3 top-9 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+              disabled={loading}
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
           </div>
 
+          {!isLogin && (
+            <div className="text-xs text-gray-600 space-y-1">
+              <p>• Password must be at least 8 characters long</p>
+              <p>• Include uppercase, lowercase, and numbers for security</p>
+            </div>
+          )}
+
           <Button
             type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? (
@@ -195,18 +176,39 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
         <div className="mt-6 text-center">
           <button
             onClick={onToggle}
-            className="text-purple-600 hover:text-purple-800 font-medium transition-colors"
+            className="text-purple-600 hover:text-purple-800 font-medium transition-colors disabled:opacity-50"
             disabled={loading}
           >
-            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+            {isLogin 
+              ? "Don't have an account? Sign up" 
+              : "Already have an account? Sign in"
+            }
           </button>
         </div>
 
-        {/* Additional demo info */}
-        <div className="mt-6 pt-4 border-t border-gray-200 text-center text-sm text-gray-500">
-          <p>This is a demo application</p>
-          <p>No real authentication required</p>
-        </div>
+        {isLogin && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <p className="text-center text-sm text-gray-600 mb-3">
+              New to social media marketing?
+            </p>
+            <div className="space-y-2 text-xs text-gray-500">
+              <div className="flex items-center justify-center space-x-4">
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                  Real followers
+                </span>
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span>
+                  24/7 support
+                </span>
+                <span className="flex items-center">
+                  <span className="w-2 h-2 bg-purple-500 rounded-full mr-1"></span>
+                  30-day guarantee
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

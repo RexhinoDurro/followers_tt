@@ -1,23 +1,27 @@
-// contexts/AuthContext.tsx - Authentication Context
+// client/src/context/AuthContext.tsx - Updated with Fixed Types
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser } from '../types';
-import { ApiService } from '../pages/services/ApiService';
+import ApiService from '../services/ApiService';
 
 interface AuthContextType {
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: any) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => false,
   register: async () => false,
-  logout: () => {},
-  loading: true
+  logout: async () => {},
+  loading: true,
+  error: null,
+  isAuthenticated: false,
 });
 
 interface AuthProviderProps {
@@ -27,17 +31,30 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const api = new ApiService();
+  const [error, setError] = useState<string | null>(null);
 
+  // Helper function to process user data and add computed name field
+  const processUserData = (userData: any): AuthUser => {
+    const processedUser = {
+      ...userData,
+      name: userData.name || `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email
+    };
+    return processedUser;
+  };
+
+  // Check for existing authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          const userData = await api.getCurrentUser();
-          setUser(userData);
+          const userData = await ApiService.getCurrentUser();
+          const processedUser = processUserData(userData);
+          setUser(processedUser);
         } catch (error) {
-          localStorage.removeItem('auth_token');
+          console.error('Auth check failed:', error);
+          // Clear invalid token
+          ApiService.clearToken();
         }
       }
       setLoading(false);
@@ -48,37 +65,71 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const userData = await api.login(email, password);
-      setUser(userData);
+      setLoading(true);
+      setError(null);
+      
+      const response = await ApiService.login(email, password);
+      const processedUser = processUserData(response.user);
+      setUser(processedUser);
+      
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setError(error.message || 'Login failed. Please try again.');
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const register = async (userData: any): Promise<boolean> => {
+  const register = async (userData: {
+    email: string;
+    password: string;
+    name: string;
+    role: string;
+    company?: string;
+  }): Promise<boolean> => {
     try {
-      const newUser = await api.register(userData);
-      setUser(newUser);
+      setLoading(true);
+      setError(null);
+      
+      const response = await ApiService.register(userData);
+      const processedUser = processUserData(response.user);
+      setUser(processedUser);
+      
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Registration failed:', error);
+      setError(error.message || 'Registration failed. Please try again.');
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      await api.logout();
+      await ApiService.logout();
     } catch (error) {
-      // Handle error
+      console.error('Logout error:', error);
     } finally {
       setUser(null);
-      localStorage.removeItem('auth_token');
+      setError(null);
     }
   };
 
+  const value: AuthContextType = {
+    user,
+    login,
+    register,
+    logout,
+    loading,
+    error,
+    isAuthenticated: !!user,
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
