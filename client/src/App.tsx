@@ -12,6 +12,10 @@ import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
 import HowItWorksPage from './pages/HowItWorksPage';
 import PricingPage from './pages/PricingPage';
+import CartPage from './pages/CartPage';
+import InstagramGrowth from './pages/services/InstagramGrowth';
+import TikTokGrowth from './pages/services/TikTokGrowth';
+import YouTubeGrowth from './pages/services/YouTubeGrowth';
 
 function App() {
   return (
@@ -32,12 +36,12 @@ function App() {
             <Route path="/faq" element={<PlaceholderPage title="FAQ" />} />
             
             {/* Service Routes */}
-            <Route path="/services/instagram" element={<ServicePage service="Instagram Growth" />} />
-            <Route path="/services/tiktok" element={<ServicePage service="TikTok Growth" />} />
-            <Route path="/services/youtube" element={<ServicePage service="YouTube Growth" />} />
+            <Route path="/services/instagram" element={<InstagramGrowth />} />
+            <Route path="/services/tiktok" element={<TikTokGrowth />} />
+            <Route path="/services/youtube" element={<YouTubeGrowth />} />
             
             {/* Cart & Checkout */}
-            <Route path="/cart" element={<PlaceholderPage title="Shopping Cart" />} />
+            <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<PlaceholderPage title="Checkout" />} />
             <Route path="/order-confirmation" element={<PlaceholderPage title="Order Confirmed" />} />
             
