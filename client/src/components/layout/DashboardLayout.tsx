@@ -63,7 +63,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
       {/* Sidebar */}
       <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
         <div className="flex items-center justify-between h-16 px-6 bg-gradient-to-r from-purple-600 to-pink-600">
-          <h1 className="text-xl font-bold text-white">SocialBoost Pro</h1>
+          <h1 className="text-xl font-bold text-white">VISIONBOOST</h1>
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-white hover:text-purple-200 transition-colors"

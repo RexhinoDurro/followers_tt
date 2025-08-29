@@ -1,4 +1,4 @@
-// client/src/pages/admin/AdminOverview.tsx - Fixed with proper type handling
+// client/src/pages/admin/AdminOverview.tsx - Enhanced with Full Functionality
 import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, 
@@ -11,9 +11,14 @@ import {
   RefreshCw,
   Plus,
   Calendar,
-  Target
+  Target,
+  Edit,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  Eye
 } from 'lucide-react';
-import { Card, Badge, Button } from '../../components/ui';
+import { Card, Badge, Button, Modal, Input } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/ApiService';
 
@@ -38,6 +43,8 @@ interface Client {
   platforms: string[];
   next_payment: string;
   total_spent: number;
+  account_manager: string;
+  created_at: string;
 }
 
 interface Task {
@@ -60,6 +67,17 @@ interface ContentPost {
   scheduled_date: string;
   status: 'draft' | 'pending-approval' | 'approved' | 'posted';
   engagement_rate?: number;
+  created_at: string;
+}
+
+interface Invoice {
+  id: string;
+  client_name: string;
+  invoice_number: string;
+  amount: number;
+  due_date: string;
+  status: 'paid' | 'pending' | 'overdue';
+  created_at: string;
 }
 
 const AdminOverview: React.FC = () => {
@@ -68,8 +86,33 @@ const AdminOverview: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [content, setContent] = useState<ContentPost[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+
+  // Modal states
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false);
+  const [showClientDetails, setShowClientDetails] = useState<Client | null>(null);
+
+  // Form states
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    client: '',
+    assigned_to: '',
+    priority: 'medium' as 'low' | 'medium' | 'high',
+    due_date: ''
+  });
+
+  const [newInvoice, setNewInvoice] = useState({
+    client: '',
+    amount: '',
+    due_date: '',
+    description: ''
+  });
 
   // Helper function to safely convert to number and format
   const safeNumber = (value: number | string | null | undefined, defaultValue: number = 0): number => {
@@ -78,13 +121,6 @@ const AdminOverview: React.FC = () => {
     return isNaN(num) ? defaultValue : num;
   };
 
-  // Helper function to format numbers with toFixed safely
-  const safeToFixed = (value: number | string | null | undefined, decimals: number = 1): string => {
-    const num = safeNumber(value);
-    return num.toFixed(decimals);
-  };
-
-  // Helper function to format currency
   const formatCurrency = (value: number | string | null | undefined): string => {
     const num = safeNumber(value);
     return num.toLocaleString('en-US', {
@@ -100,17 +136,37 @@ const AdminOverview: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [statsData, clientsData, tasksData, contentData] = await Promise.all([
+      const [statsData, clientsData, tasksData, contentData, invoicesData] = await Promise.all([
         ApiService.getDashboardStats(),
         ApiService.getClients(),
         ApiService.getTasks(),
         ApiService.getContent(),
+        ApiService.getInvoices(),
       ]);
 
-      setStats(statsData);
-      setClients(Array.isArray(clientsData) ? clientsData : clientsData?.results || []);
-      setTasks(Array.isArray(tasksData) ? tasksData : tasksData?.results || []);
-      setContent(Array.isArray(contentData) ? contentData : contentData?.results || []);
+      setStats(statsData as DashboardStats);
+      setClients(Array.isArray(clientsData) ? clientsData : []);
+      setTasks(
+        Array.isArray(tasksData)
+          ? tasksData
+          : (typeof tasksData === 'object' && tasksData !== null && Array.isArray((tasksData as any).results))
+            ? (tasksData as any).results
+            : []
+      );
+      setContent(
+        Array.isArray(contentData)
+          ? contentData
+          : (typeof contentData === 'object' && contentData !== null && 'results' in contentData && Array.isArray((contentData as any).results))
+            ? (contentData as any).results
+            : []
+      );
+      setInvoices(
+        Array.isArray(invoicesData)
+          ? invoicesData
+          : (typeof invoicesData === 'object' && invoicesData !== null && 'results' in invoicesData && Array.isArray((invoicesData as any).results))
+            ? (invoicesData as any).results
+            : []
+      );
     } catch (err: any) {
       console.error('Failed to fetch dashboard data:', err);
       setError(err.message || 'Failed to load dashboard data');
@@ -119,16 +175,10 @@ const AdminOverview: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchData();
-    }
-  }, [user]);
-
   const handleTaskStatusUpdate = async (taskId: string, newStatus: string) => {
     try {
       await ApiService.updateTask(taskId, { status: newStatus });
-      await fetchData(); // Refresh data
+      await fetchData();
     } catch (err) {
       console.error('Failed to update task:', err);
     }
@@ -141,11 +191,76 @@ const AdminOverview: React.FC = () => {
       } else {
         await ApiService.rejectContent(contentId);
       }
-      await fetchData(); // Refresh data
+      await fetchData();
     } catch (err) {
       console.error('Failed to update content:', err);
     }
   };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await ApiService.createTask(newTask);
+      setShowCreateTask(false);
+      setNewTask({
+        title: '',
+        description: '',
+        client: '',
+        assigned_to: '',
+        priority: 'medium',
+        due_date: ''
+      });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    }
+  };
+
+  const handleCreateInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const invoiceData = {
+        ...newInvoice,
+        amount: parseFloat(newInvoice.amount),
+        invoice_number: `INV-${Date.now()}`
+      };
+      await ApiService.createInvoice(invoiceData);
+      setShowCreateInvoice(false);
+      setNewInvoice({
+        client: '',
+        amount: '',
+        due_date: '',
+        description: ''
+      });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to create invoice:', err);
+    }
+  };
+
+  const handlePaymentStatusUpdate = async (clientId: string, status: string) => {
+    try {
+      await ApiService.updatePaymentStatus(clientId, status);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to update payment status:', err);
+    }
+  };
+
+  const handleMarkInvoicePaid = async (invoiceId: string) => {
+    try {
+      await ApiService.markInvoicePaid(invoiceId);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to mark invoice as paid:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchData();
+    }
+  }, [user]);
 
   if (!user || user.role !== 'admin') {
     return (
@@ -215,13 +330,6 @@ const AdminOverview: React.FC = () => {
       color: 'text-red-600',
       trend: null
     },
-    {
-      name: 'Followers Delivered',
-      value: safeNumber(stats?.total_followers_delivered).toLocaleString(),
-      icon: TrendingUp,
-      color: 'text-purple-600',
-      trend: `+${safeToFixed(stats?.monthly_growth_rate)}%`
-    }
   ];
 
   return (
@@ -239,15 +347,19 @@ const AdminOverview: React.FC = () => {
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button>
+          <Button onClick={() => setShowCreateTask(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            New Client
+            New Task
+          </Button>
+          <Button onClick={() => setShowCreateInvoice(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Invoice
           </Button>
         </div>
       </div>
       
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat) => (
           <Card key={stat.name} className="hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
@@ -272,9 +384,9 @@ const AdminOverview: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Tasks */}
         <Card title="Recent Tasks" action={
-          <Button size="sm" variant="outline">
-            <Calendar className="w-4 h-4 mr-1" />
-            View All
+          <Button size="sm" variant="outline" onClick={() => setShowCreateTask(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Task
           </Button>
         }>
           <div className="space-y-4">
@@ -306,13 +418,6 @@ const AdminOverview: React.FC = () => {
                     <option value="review">Review</option>
                     <option value="completed">Completed</option>
                   </select>
-                  <Badge variant={
-                    task.status === 'completed' ? 'success' :
-                    task.status === 'in-progress' ? 'primary' :
-                    task.status === 'review' ? 'warning' : 'default'
-                  }>
-                    {task.status.replace('-', ' ')}
-                  </Badge>
                 </div>
               </div>
             ))}
@@ -357,16 +462,19 @@ const AdminOverview: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex items-center space-x-2">
                   <Badge variant={
                     client.payment_status === 'paid' ? 'success' :
                     client.payment_status === 'overdue' ? 'danger' : 'warning'
                   }>
                     {client.payment_status}
                   </Badge>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Total: ${client.total_spent.toLocaleString()}
-                  </p>
+                  <button
+                    onClick={() => setShowClientDetails(client)}
+                    className="p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -411,6 +519,7 @@ const AdminOverview: React.FC = () => {
                     variant="success"
                     onClick={() => handleContentApproval(post.id, true)}
                   >
+                    <CheckCircle className="w-4 h-4 mr-1" />
                     Approve
                   </Button>
                   <Button 
@@ -418,7 +527,8 @@ const AdminOverview: React.FC = () => {
                     variant="outline"
                     onClick={() => handleContentApproval(post.id, false)}
                   >
-                    Request Changes
+                    <XCircle className="w-4 h-4 mr-1" />
+                    Reject
                   </Button>
                 </div>
                 <Badge variant="warning">Pending Review</Badge>
@@ -429,6 +539,71 @@ const AdminOverview: React.FC = () => {
             <div className="text-center py-6">
               <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-500">No content pending approval</p>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Recent Invoices */}
+      <Card title="Recent Invoices" action={
+        <Button size="sm" variant="outline" onClick={() => setShowCreateInvoice(true)}>
+          <Plus className="w-4 h-4 mr-1" />
+          New Invoice
+        </Button>
+      }>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left border-b">
+                <th className="pb-3 font-medium text-gray-900">Invoice</th>
+                <th className="pb-3 font-medium text-gray-900">Client</th>
+                <th className="pb-3 font-medium text-gray-900">Amount</th>
+                <th className="pb-3 font-medium text-gray-900">Due Date</th>
+                <th className="pb-3 font-medium text-gray-900">Status</th>
+                <th className="pb-3 font-medium text-gray-900">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {invoices.slice(0, 5).map((invoice) => (
+                <tr key={invoice.id} className="hover:bg-gray-50">
+                  <td className="py-4 font-medium text-gray-900">
+                    #{invoice.invoice_number}
+                  </td>
+                  <td className="py-4 text-gray-900">
+                    {invoice.client_name}
+                  </td>
+                  <td className="py-4 text-gray-900">
+                    {formatCurrency(invoice.amount)}
+                  </td>
+                  <td className="py-4 text-gray-600">
+                    {new Date(invoice.due_date).toLocaleDateString()}
+                  </td>
+                  <td className="py-4">
+                    <Badge variant={
+                      invoice.status === 'paid' ? 'success' :
+                      invoice.status === 'overdue' ? 'danger' : 'warning'
+                    }>
+                      {invoice.status}
+                    </Badge>
+                  </td>
+                  <td className="py-4">
+                    {invoice.status === 'pending' && (
+                      <Button size="sm" onClick={() => handleMarkInvoicePaid(invoice.id)}>
+                        Mark Paid
+                      </Button>
+                    )}
+                    {invoice.status === 'paid' && (
+                      <Button size="sm" variant="outline">Download</Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {invoices.length === 0 && (
+            <div className="text-center py-6">
+              <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No invoices found</p>
             </div>
           )}
         </div>
@@ -454,6 +629,235 @@ const AdminOverview: React.FC = () => {
           <p className="text-sm text-gray-600">Generate performance reports for clients</p>
         </Card>
       </div>
+
+      {/* Create Task Modal */}
+      <Modal
+        isOpen={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        title="Create New Task"
+        size="md"
+      >
+        <form onSubmit={handleCreateTask} className="space-y-4">
+          <Input
+            label="Task Title"
+            value={newTask.title}
+            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+            required
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              value={newTask.description}
+              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              rows={3}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Client
+            </label>
+            <select
+              value={newTask.client}
+              onChange={(e) => setNewTask({ ...newTask, client: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name} - {client.company}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Input
+            label="Assigned To"
+            value={newTask.assigned_to}
+            onChange={(e) => setNewTask({ ...newTask, assigned_to: e.target.value })}
+            required
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Priority
+              </label>
+              <select
+                value={newTask.priority}
+                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as 'low' | 'medium' | 'high' })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <Input
+              label="Due Date"
+              type="datetime-local"
+              value={newTask.due_date}
+              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+              required
+            />
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={() => setShowCreateTask(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              Create Task
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Create Invoice Modal */}
+      <Modal
+        isOpen={showCreateInvoice}
+        onClose={() => setShowCreateInvoice(false)}
+        title="Create New Invoice"
+        size="md"
+      >
+        <form onSubmit={handleCreateInvoice} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Client
+            </label>
+            <select
+              value={newInvoice.client}
+              onChange={(e) => setNewInvoice({ ...newInvoice, client: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              required
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name} - {client.company}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Amount"
+              type="number"
+              step="0.01"
+              value={newInvoice.amount}
+              onChange={(e) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
+              required
+            />
+            <Input
+              label="Due Date"
+              type="date"
+              value={newInvoice.due_date}
+              onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description (Optional)
+            </label>
+            <textarea
+              value={newInvoice.description}
+              onChange={(e) => setNewInvoice({ ...newInvoice, description: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              rows={3}
+              placeholder="Service description..."
+            />
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={() => setShowCreateInvoice(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              Create Invoice
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Client Details Modal */}
+      {showClientDetails && (
+        <Modal
+          isOpen={!!showClientDetails}
+          onClose={() => setShowClientDetails(null)}
+          title={`Client Details - ${showClientDetails.name}`}
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-600">Company</label>
+                <p className="text-gray-900">{showClientDetails.company}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Email</label>
+                <p className="text-gray-900">{showClientDetails.email}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Package</label>
+                <p className="text-gray-900">{showClientDetails.package}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Monthly Fee</label>
+                <p className="text-gray-900">{formatCurrency(showClientDetails.monthly_fee)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Status</label>
+                <Badge variant={
+                  showClientDetails.status === 'active' ? 'success' :
+                  showClientDetails.status === 'pending' ? 'warning' : 'default'
+                }>
+                  {showClientDetails.status}
+                </Badge>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Payment Status</label>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={
+                    showClientDetails.payment_status === 'paid' ? 'success' :
+                    showClientDetails.payment_status === 'overdue' ? 'danger' : 'warning'
+                  }>
+                    {showClientDetails.payment_status}
+                  </Badge>
+                  {showClientDetails.payment_status !== 'paid' && (
+                    <button
+                      onClick={() => handlePaymentStatusUpdate(showClientDetails.id, 'paid')}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Mark as Paid
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Account Manager</label>
+                <p className="text-gray-900">{showClientDetails.account_manager}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Total Spent</label>
+                <p className="text-gray-900">{formatCurrency(showClientDetails.total_spent)}</p>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Platforms</label>
+              <div className="flex space-x-2 mt-1">
+                {showClientDetails.platforms.map((platform, idx) => (
+                  <Badge key={idx} variant="primary">{platform}</Badge>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Next Payment Date</label>
+              <p className="text-gray-900">{new Date(showClientDetails.next_payment).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

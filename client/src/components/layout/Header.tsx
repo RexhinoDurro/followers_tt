@@ -36,9 +36,9 @@ export const Header: React.FC = () => {
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 isActive('/') 
                   ? 'border-b-2' 
-                  : 'text-gray-700 hover:text-gray-900'
+                  : 'text-white hover:text-gray-900'
               }`}
-              style={isActive('/') ? { color: '#6C44B4', borderBottomColor: '#6C44B4' } : {}}
+              style={isActive('/') ? { color: '#FFFFFF', borderBottomColor: '#6C44B4' } : {}}
             >
               Home
             </Link>
@@ -47,8 +47,8 @@ export const Header: React.FC = () => {
               <button 
                 className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors"
                 style={{ '--hover-color': '#6C44B4' } as React.CSSProperties}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#6C44B4'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#374151'}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#FFFFFF'}
               >
                 Services ↓
               </button>
@@ -106,11 +106,11 @@ export const Header: React.FC = () => {
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 isActive('/pricing') 
                   ? 'border-b-2' 
-                  : 'text-gray-700 hover:text-gray-900'
+                  : 'text-white hover:text-gray-900'
               }`}
-              style={isActive('/pricing') ? { color: '#6C44B4', borderBottomColor: '#6C44B4' } : {}}
-              onMouseEnter={(e) => !isActive('/pricing') && (e.currentTarget.style.color = '#6C44B4')}
-              onMouseLeave={(e) => !isActive('/pricing') && (e.currentTarget.style.color = '#374151')}
+              style={isActive('/pricing') ? { color: '#FFFFFF', borderBottomColor: '#6C44B4' } : {}}
+              onMouseEnter={(e) => !isActive('/pricing') && (e.currentTarget.style.color = '#FFFFFF')}
+              onMouseLeave={(e) => !isActive('/pricing') && (e.currentTarget.style.color = '#FFFFFF')}
             >
               Pricing
             </Link>
@@ -120,11 +120,11 @@ export const Header: React.FC = () => {
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 isActive('/how-it-works') 
                   ? 'border-b-2' 
-                  : 'text-gray-700 hover:text-gray-900'
+                  : 'text-white hover:text-gray-900'
               }`}
-              style={isActive('/how-it-works') ? { color: '#6C44B4', borderBottomColor: '#6C44B4' } : {}}
-              onMouseEnter={(e) => !isActive('/how-it-works') && (e.currentTarget.style.color = '#6C44B4')}
-              onMouseLeave={(e) => !isActive('/how-it-works') && (e.currentTarget.style.color = '#374151')}
+              style={isActive('/how-it-works') ? { color: '#FFFFFF', borderBottomColor: '#6C44B4' } : {}}
+              onMouseEnter={(e) => !isActive('/how-it-works') && (e.currentTarget.style.color = '#FFFFFF')}
+              onMouseLeave={(e) => !isActive('/how-it-works') && (e.currentTarget.style.color = '#FFFFFF')}
             >
               How It Works
             </Link>
@@ -134,9 +134,9 @@ export const Header: React.FC = () => {
               className={`px-3 py-2 text-sm font-medium transition-colors ${
                 isActive('/contact') 
                   ? 'border-b-2' 
-                  : 'text-gray-700 hover:text-gray-900'
+                  : 'text-white hover:text-gray-900'
               }`}
-              style={isActive('/contact') ? { color: '#6C44B4', borderBottomColor: '#6C44B4' } : {}}
+              style={isActive('/contact') ? { color: '#FFFFFF', borderBottomColor: '#6C44B4' } : {}}
               onMouseEnter={(e) => !isActive('/contact') && (e.currentTarget.style.color = '#6C44B4')}
               onMouseLeave={(e) => !isActive('/contact') && (e.currentTarget.style.color = '#374151')}
             >

@@ -13,12 +13,20 @@ from django.db.models import Sum, Count, Q, Avg
 from django.utils import timezone
 from datetime import datetime, timedelta
 import calendar
+import logging
+from django.urls import path
+from celery import shared_task
 
-from .models import (
+from api import serializers
+from api.tasks import update_client_monthly_performance
+
+logger = logging.getLogger(__name__)
+
+from ..models import (
     User, Client, Task, ContentPost, PerformanceData,
     Message, Invoice, TeamMember, Project, File, Notification
 )
-from .serializers import (
+from ..serializers import (
     UserSerializer, UserRegistrationSerializer, UserLoginSerializer,
     ClientSerializer, TaskSerializer, ContentPostSerializer,
     PerformanceDataSerializer, MessageSerializer, InvoiceSerializer,
@@ -179,6 +187,498 @@ def client_dashboard_stats_view(request):
     
     serializer = ClientDashboardStatsSerializer(stats_data)
     return Response(serializer.data)
+
+
+# server/api/views.py - Add these ViewSets and update existing file
+
+from rest_framework.viewsets import ModelViewSet
+from ..models import SocialMediaAccount, RealTimeMetrics
+from ..serializers import SocialMediaAccountSerializer, RealTimeMetricsSerializer
+
+class SocialMediaAccountViewSet(ModelViewSet):
+    """Social Media Account management viewset"""
+    serializer_class = SocialMediaAccountSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.role == 'admin':
+            return SocialMediaAccount.objects.all()
+        else:
+            # Clients can only see their own accounts
+            try:
+                client = self.request.user.client_profile
+                return SocialMediaAccount.objects.filter(client=client)
+            except Client.DoesNotExist:
+                return SocialMediaAccount.objects.none()
+    
+    def perform_create(self, serializer):
+        # Only admins can create accounts manually
+        if self.request.user.role != 'admin':
+            raise PermissionError('Admin access required')
+        serializer.save()
+    
+    @action(detail=True, methods=['post'])
+    def sync(self, request, pk=None):
+        """Trigger manual sync for account"""
+        account = self.get_object()
+        
+        # Check permission
+        if request.user.role == 'client':
+            try:
+                client = request.user.client_profile
+                if account.client != client:
+                    return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            except Client.DoesNotExist:
+                return Response({'error': 'Client profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Trigger sync task
+        if account.platform == 'instagram':
+            from api.tasks import sync_instagram_data
+            task = sync_instagram_data.delay(str(account.id))
+        elif account.platform == 'youtube':
+            from api.tasks import sync_youtube_data
+            task = sync_youtube_data.delay(str(account.id))
+        else:
+            return Response({'error': f'Sync not supported for {account.platform}'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({
+            'message': f'Sync triggered for {account.platform} account',
+            'task_id': task.id
+        })
+    
+    @action(detail=True, methods=['post'])
+    def disconnect(self, request, pk=None):
+        """Disconnect social media account"""
+        account = self.get_object()
+        
+        # Check permission
+        if request.user.role == 'client':
+            try:
+                client = request.user.client_profile
+                if account.client != client:
+                    return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            except Client.DoesNotExist:
+                return Response({'error': 'Client profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Soft delete - preserve historical data
+        account.is_active = False
+        account.save()
+        
+        return Response({'message': f'{account.platform} account disconnected'})
+
+# Add serializers to serializers.py
+class SocialMediaAccountSerializer(serializers.ModelSerializer):
+    """Social Media Account serializer"""
+    client_name = serializers.CharField(source='client.name', read_only=True)
+    
+    class Meta:
+        model = SocialMediaAccount
+        fields = [
+            'id', 'client', 'client_name', 'platform', 'account_id',
+            'username', 'is_active', 'last_sync', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'last_sync']
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        
+        # Get latest metrics
+        latest_metrics = RealTimeMetrics.objects.filter(
+            account=instance
+        ).order_by('-date').first()
+        
+        if latest_metrics:
+            data['followers_count'] = latest_metrics.followers_count
+            data['engagement_rate'] = float(latest_metrics.engagement_rate)
+            data['posts_count'] = latest_metrics.posts_count
+        else:
+            data['followers_count'] = 0
+            data['engagement_rate'] = 0
+            data['posts_count'] = 0
+            
+        return data
+
+class RealTimeMetricsSerializer(serializers.ModelSerializer):
+    """Real-time metrics serializer"""
+    account_username = serializers.CharField(source='account.username', read_only=True)
+    account_platform = serializers.CharField(source='account.platform', read_only=True)
+    
+    class Meta:
+        model = RealTimeMetrics
+        fields = [
+            'id', 'account', 'account_username', 'account_platform', 'date',
+            'followers_count', 'following_count', 'posts_count', 'engagement_rate',
+            'reach', 'impressions', 'profile_views', 'website_clicks',
+            'daily_growth', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+# Update views.py to include the real-time metrics endpoint
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_realtime_metrics(request):
+    """Get real-time metrics for connected accounts"""
+    if request.user.role == 'client':
+        try:
+            client = request.user.client_profile
+            accounts = SocialMediaAccount.objects.filter(client=client, is_active=True)
+        except Client.DoesNotExist:
+            return Response({'error': 'Client profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        # Admin can see all accounts
+        accounts = SocialMediaAccount.objects.filter(is_active=True)
+    
+    metrics_data = []
+    for account in accounts:
+        # Get latest metrics for each account
+        latest_metrics = RealTimeMetrics.objects.filter(
+            account=account
+        ).order_by('-date').first()
+        
+        if latest_metrics:
+            metrics_data.append({
+                'account': {
+                    'id': str(account.id),
+                    'platform': account.platform,
+                    'username': account.username
+                },
+                'followers_count': latest_metrics.followers_count,
+                'engagement_rate': float(latest_metrics.engagement_rate),
+                'reach': latest_metrics.reach,
+                'daily_growth': latest_metrics.daily_growth,
+                'last_updated': latest_metrics.created_at
+            })
+    
+    return Response({'data': metrics_data})
+
+# Update get_connected_accounts view in oauth_views.py
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_connected_accounts(request):
+    """Get all connected social media accounts for current user"""
+    try:
+        if request.user.role != 'client':
+            return Response({'error': 'Only clients can view social accounts'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            client = request.user.client_profile
+        except Client.DoesNotExist:
+            return Response({'error': 'Client profile not found'}, 
+                          status=status.HTTP_404_NOT_FOUND)
+        
+        accounts = SocialMediaAccount.objects.filter(client=client)
+        serializer = SocialMediaAccountSerializer(accounts, many=True)
+        
+        return Response({
+            'accounts': serializer.data,
+            'total_count': len(serializer.data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get connected accounts: {str(e)}")
+        return Response({'error': 'Internal server error'}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Add better error handling and create client profile if missing
+def create_client_profile_if_missing(user):
+    """Create client profile if it doesn't exist"""
+    if user.role == 'client':
+        try:
+            return user.client_profile
+        except Client.DoesNotExist:
+            # Create a basic client profile
+            client = Client.objects.create(
+                user=user,
+                name=user.get_full_name() or user.username,
+                email=user.email,
+                company=user.company or 'Personal',
+                package='Basic Package',
+                monthly_fee=99.00,
+                start_date=timezone.now().date(),
+                account_manager='Admin Team',
+                next_payment=timezone.now().date() + timedelta(days=30)
+            )
+            return client
+    return None
+
+# Update client dashboard stats view with better error handling
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def client_dashboard_stats_view(request):
+    """Get dashboard statistics for client users"""
+    if request.user.role != 'client':
+        return Response({'error': 'Client access required'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        client = create_client_profile_if_missing(request.user)
+        if not client:
+            return Response({'error': 'Client profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error getting client profile: {str(e)}")
+        return Response({'error': 'Failed to get client profile'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    try:
+        # Get latest performance data
+        latest_performance = PerformanceData.objects.filter(
+            client=client
+        ).order_by('-month').first()
+        
+        # Get connected accounts metrics
+        connected_accounts = SocialMediaAccount.objects.filter(client=client, is_active=True)
+        total_followers = 0
+        avg_engagement = 0
+        total_reach = 0
+        
+        if connected_accounts.exists():
+            latest_metrics = RealTimeMetrics.objects.filter(
+                account__in=connected_accounts
+            ).order_by('account', '-date').distinct('account')
+            
+            total_followers = sum(metric.followers_count for metric in latest_metrics)
+            if latest_metrics:
+                avg_engagement = sum(float(metric.engagement_rate) for metric in latest_metrics) / len(latest_metrics)
+            total_reach = sum(metric.reach for metric in latest_metrics)
+        
+        # Posts this month
+        current_month = timezone.now().replace(day=1)
+        posts_this_month = ContentPost.objects.filter(
+            client=client,
+            created_at__gte=current_month
+        ).count()
+        
+        # Growth rate calculation
+        performance_data = PerformanceData.objects.filter(
+            client=client
+        ).order_by('-month')[:2]
+        
+        growth_rate = 0
+        if len(performance_data) >= 2:
+            current = performance_data[0]
+            previous = performance_data[1]
+            if previous.followers > 0:
+                growth_rate = ((current.followers - previous.followers) / previous.followers) * 100
+        elif connected_accounts.exists() and latest_performance:
+            # Use connected accounts data vs last performance data
+            if latest_performance.followers > 0:
+                growth_rate = ((total_followers - latest_performance.followers) / latest_performance.followers) * 100
+        
+        stats_data = {
+            'total_followers': total_followers or (latest_performance.followers if latest_performance else 0),
+            'engagement_rate': avg_engagement or (latest_performance.engagement if latest_performance else 0),
+            'posts_this_month': posts_this_month,
+            'reach': total_reach or (latest_performance.reach if latest_performance else 0),
+            'growth_rate': growth_rate,
+            'next_payment_amount': client.monthly_fee,
+            'next_payment_date': client.next_payment
+        }
+        
+        serializer = ClientDashboardStatsSerializer(stats_data)
+        return Response(serializer.data)
+        
+    except Exception as e:
+        logger.error(f"Error calculating client dashboard stats: {str(e)}")
+        return Response({'error': 'Failed to calculate statistics'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Add URL for real-time metrics to urls.py
+urlpatterns = [
+    # ... existing URLs ...
+    
+    # Real-time metrics endpoint
+    path('metrics/realtime/', get_realtime_metrics, name='realtime_metrics'),
+    
+    # ... rest of URLs ...
+]
+
+# Create a comprehensive dashboard management system
+class DashboardManager:
+    """Centralized dashboard data management"""
+    
+    @staticmethod
+    def get_admin_stats():
+        """Get admin dashboard statistics"""
+        current_month = timezone.now().replace(day=1)
+        
+        return {
+            'total_revenue': Invoice.objects.filter(
+                status='paid',
+                paid_at__gte=current_month
+            ).aggregate(Sum('amount'))['amount__sum'] or 0,
+            
+            'active_clients': Client.objects.filter(status='active').count(),
+            
+            'pending_tasks': Task.objects.filter(
+                status__in=['pending', 'in-progress']
+            ).count(),
+            
+            'overdue_payments': Invoice.objects.filter(status='overdue').count(),
+            
+            'total_followers_delivered': RealTimeMetrics.objects.filter(
+                date=timezone.now().date()
+            ).aggregate(Sum('followers_count'))['followers_count__sum'] or 0,
+            
+            'monthly_growth_rate': DashboardManager._calculate_monthly_growth_rate()
+        }
+    
+    @staticmethod
+    def get_client_stats(client):
+        """Get client dashboard statistics"""
+        # Get real-time data from connected accounts
+        connected_accounts = SocialMediaAccount.objects.filter(client=client, is_active=True)
+        
+        if connected_accounts.exists():
+            # Use real-time data
+            latest_metrics = RealTimeMetrics.objects.filter(
+                account__in=connected_accounts,
+                date=timezone.now().date()
+            )
+            
+            total_followers = sum(metric.followers_count for metric in latest_metrics)
+            avg_engagement = sum(float(metric.engagement_rate) for metric in latest_metrics) / len(latest_metrics) if latest_metrics else 0
+            total_reach = sum(metric.reach for metric in latest_metrics)
+            
+            # Calculate growth rate from daily growth
+            daily_growth = sum(metric.daily_growth for metric in latest_metrics)
+            growth_rate = (daily_growth / total_followers) * 100 if total_followers > 0 else 0
+        else:
+            # Fallback to performance data
+            latest_performance = PerformanceData.objects.filter(
+                client=client
+            ).order_by('-month').first()
+            
+            total_followers = latest_performance.followers if latest_performance else 0
+            avg_engagement = latest_performance.engagement if latest_performance else 0
+            total_reach = latest_performance.reach if latest_performance else 0
+            growth_rate = latest_performance.growth_rate if latest_performance else 0
+        
+        # Posts this month
+        current_month = timezone.now().replace(day=1)
+        posts_this_month = ContentPost.objects.filter(
+            client=client,
+            created_at__gte=current_month
+        ).count()
+        
+        return {
+            'total_followers': total_followers,
+            'engagement_rate': avg_engagement,
+            'posts_this_month': posts_this_month,
+            'reach': total_reach,
+            'growth_rate': growth_rate,
+            'next_payment_amount': client.monthly_fee,
+            'next_payment_date': client.next_payment
+        }
+    
+    @staticmethod
+    def _calculate_monthly_growth_rate():
+        """Calculate monthly growth rate across all clients"""
+        current_month = timezone.now().date().replace(day=1)
+        previous_month = (current_month - timedelta(days=1)).replace(day=1)
+        
+        current_total = PerformanceData.objects.filter(
+            month=current_month
+        ).aggregate(Sum('followers'))['followers__sum'] or 0
+        
+        previous_total = PerformanceData.objects.filter(
+            month=previous_month
+        ).aggregate(Sum('followers'))['followers__sum'] or 0
+        
+        if previous_total > 0:
+            return ((current_total - previous_total) / previous_total) * 100
+        return 0
+
+# Update the main dashboard views to use DashboardManager
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_stats_view(request):
+    """Get dashboard statistics for admin users"""
+    if request.user.role != 'admin':
+        return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        stats_data = DashboardManager.get_admin_stats()
+        serializer = DashboardStatsSerializer(stats_data)
+        return Response(serializer.data)
+    except Exception as e:
+        logger.error(f"Error getting admin dashboard stats: {str(e)}")
+        return Response({'error': 'Failed to get dashboard statistics'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  
+def client_dashboard_stats_view_updated(request):
+    """Updated client dashboard stats view"""
+    if request.user.role != 'client':
+        return Response({'error': 'Client access required'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        client = create_client_profile_if_missing(request.user)
+        if not client:
+            return Response({'error': 'Client profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        stats_data = DashboardManager.get_client_stats(client)
+        serializer = ClientDashboardStatsSerializer(stats_data)
+        return Response(serializer.data)
+        
+    except Exception as e:
+        logger.error(f"Error getting client dashboard stats: {str(e)}")
+        return Response({'error': 'Failed to get dashboard statistics'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Add comprehensive error handling to OAuth views
+from django.conf import settings
+
+def handle_oauth_error(platform, error, user_id=None):
+    """Centralized OAuth error handling"""
+    logger.error(f"OAuth error for {platform}: {str(error)}")
+    
+    if user_id:
+        # Create notification for user about failed connection
+        try:
+            user = User.objects.get(id=user_id)
+            Notification.objects.create(
+                user=user,
+                title=f"Failed to connect {platform.title()}",
+                message=f"There was an error connecting your {platform} account. Please try again.",
+                notification_type='message_received'
+            )
+        except User.DoesNotExist:
+            pass
+    
+    return {
+        'error': f'Failed to connect {platform} account',
+        'details': str(error) if settings.DEBUG else 'Please try again or contact support'
+    }
+
+# Create task for updating client monthly performance automatically
+@shared_task(bind=True, max_retries=2)
+def update_all_monthly_performance(self):
+    """Update monthly performance for all clients"""
+    try:
+        clients = Client.objects.filter(status='active')
+        updated_count = 0
+        
+        for client in clients:
+            try:
+                update_client_monthly_performance.delay(str(client.id))
+                updated_count += 1
+            except Exception as e:
+                logger.error(f"Failed to queue performance update for client {client.id}: {str(e)}")
+        
+        logger.info(f"Queued monthly performance updates for {updated_count} clients")
+        return {'status': 'success', 'clients_updated': updated_count}
+        
+    except Exception as exc:
+        logger.error(f"Failed to update all monthly performance: {str(exc)}")
+        raise self.retry(exc=exc, countdown=300)
+
+# Add to settings.py CELERY_BEAT_SCHEDULE
+"""
+'update-all-monthly-performance': {
+    'task': 'api.tasks.update_all_monthly_performance',
+    'schedule': crontab(minute=30, hour=1),  # Daily at 1:30 AM
+},
+"""
+
+
 
 # ViewSets for CRUD operations
 class ClientViewSet(ModelViewSet):

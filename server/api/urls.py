@@ -12,7 +12,7 @@ from .views import (
     # ViewSets
     ClientViewSet, TaskViewSet, ContentPostViewSet,
     PerformanceDataViewSet, MessageViewSet, InvoiceViewSet,
-    FileViewSet, NotificationViewSet, SocialMediaAccountViewSet,
+    FileViewSet, NotificationViewSet, #SocialMediaAccountViewSet,
     
     # Analytics views
     analytics_overview, client_performance_report,
@@ -57,7 +57,7 @@ router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'files', FileViewSet, basename='file')
 router.register(r'notifications', NotificationViewSet, basename='notification')
-router.register(r'social-accounts', SocialMediaAccountViewSet, basename='social-account')
+#router.register(r'social-accounts', SocialMediaAccountViewSet, basename='social-account')
 
 urlpatterns = [
     # Authentication endpoints

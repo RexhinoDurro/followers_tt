@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts
+// client/src/services/ApiService.ts - Fixed and Enhanced
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -8,7 +8,7 @@ class ApiService {
     this.token = localStorage.getItem('auth_token');
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
     const config: RequestInit = {
@@ -24,17 +24,27 @@ class ApiService {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        if (response.status === 401) {
+          this.clearToken();
+          window.location.href = '/auth';
+          throw new Error('Authentication failed');
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      // Handle empty responses
+      // Handle empty responses (like DELETE)
+      if (response.status === 204) {
+        return null as T;
+      }
+
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         return await response.json();
       }
       
-      return null;
+      return null as T;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
@@ -43,7 +53,10 @@ class ApiService {
 
   // Authentication methods
   async login(email: string, password: string) {
-    const response = await this.request('/auth/login/', {
+    const response = await this.request<{
+      user: any;
+      token: string;
+    }>('/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -64,7 +77,10 @@ class ApiService {
     role: string;
     company?: string;
   }) {
-    const response = await this.request('/auth/register/', {
+    const response = await this.request<{
+      user: any;
+      token: string;
+    }>('/auth/register/', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -78,16 +94,14 @@ class ApiService {
     return response;
   }
 
-  async logout() {
+  async logout(): Promise<void> {
     if (this.token) {
       await this.request('/auth/logout/', {
         method: 'POST',
       });
     }
     
-    this.token = null;
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+    this.clearToken();
   }
 
   async getCurrentUser() {
@@ -119,6 +133,13 @@ class ApiService {
     });
   }
 
+  async updatePaymentStatus(id: string, paymentStatus: string) {
+    return await this.request(`/clients/${id}/update_payment_status/`, {
+      method: 'POST',
+      body: JSON.stringify({ payment_status: paymentStatus }),
+    });
+  }
+
   // Task methods
   async getTasks() {
     return await this.request('/tasks/');
@@ -144,6 +165,18 @@ class ApiService {
     });
   }
 
+  async bulkUpdateTasks(data: {
+    task_ids: string[];
+    status?: string;
+    assigned_to?: string;
+    priority?: string;
+  }) {
+    return await this.request('/tasks/bulk_update/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Content methods
   async getContent() {
     return await this.request('/content/');
@@ -165,6 +198,17 @@ class ApiService {
   async rejectContent(id: string) {
     return await this.request(`/content/${id}/reject/`, {
       method: 'POST',
+    });
+  }
+
+  async bulkApproveContent(data: {
+    content_ids: string[];
+    action: 'approve' | 'reject';
+    feedback?: string;
+  }) {
+    return await this.request('/content/bulk_approve/', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 
@@ -212,6 +256,13 @@ class ApiService {
     });
   }
 
+  async createInvoice(invoiceData: any) {
+    return await this.request('/invoices/', {
+      method: 'POST',
+      body: JSON.stringify(invoiceData),
+    });
+  }
+
   // Notification methods
   async getNotifications() {
     return await this.request('/notifications/');
@@ -238,6 +289,43 @@ class ApiService {
     return await this.request(`/analytics/client/${clientId}/`);
   }
 
+  // Social Media Account methods
+  async getConnectedAccounts() {
+    return await this.request('/social-accounts/');
+  }
+
+  async initiateOAuth(platform: string) {
+    return await this.request(`/oauth/${platform}/initiate/`);
+  }
+
+  async handleOAuthCallback(platform: string, code: string, state: string) {
+    return await this.request(`/oauth/${platform}/callback/`, {
+      method: 'POST',
+      body: JSON.stringify({ code, state }),
+    });
+  }
+
+  async disconnectAccount(accountId: string) {
+    return await this.request(`/social-accounts/${accountId}/disconnect/`, {
+      method: 'POST',
+    });
+  }
+
+  async triggerManualSync(accountId: string) {
+    return await this.request(`/social-accounts/${accountId}/sync/`, {
+      method: 'POST',
+    });
+  }
+
+  async getSyncStatus(accountId: string) {
+    return await this.request(`/social-accounts/${accountId}/status/`);
+  }
+
+  // Real-time metrics
+  async getRealTimeMetrics() {
+    return await this.request('/metrics/realtime/');
+  }
+
   // File upload methods
   async uploadFile(file: File, clientId: string, fileType: string) {
     const formData = new FormData();
@@ -250,6 +338,7 @@ class ApiService {
       method: 'POST',
       headers: {
         ...(this.token && { Authorization: `Token ${this.token}` }),
+        // Don't set Content-Type for FormData, let browser set it
       },
       body: formData,
     });
@@ -261,12 +350,12 @@ class ApiService {
   }
 
   // Utility methods
-  setToken(token: string) {
+  setToken(token: string): void {
     this.token = token;
     localStorage.setItem('auth_token', token);
   }
 
-  clearToken() {
+  clearToken(): void {
     this.token = null;
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
@@ -275,6 +364,15 @@ class ApiService {
   isAuthenticated(): boolean {
     return !!this.token;
   }
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  getBaseURL(): string {
+    return this.baseURL;
+  }
 }
 
+// Export a singleton instance
 export default new ApiService();
