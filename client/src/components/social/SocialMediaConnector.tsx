@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type JSX } from 'react';
 import { 
   Plus, 
-  Instagram, 
-  Youtube, 
   Loader2, 
   CheckCircle, 
   AlertCircle, 
@@ -11,16 +9,52 @@ import {
   Settings
 } from 'lucide-react';
 
-const SocialMediaConnector = () => {
-  const [connectedAccounts, setConnectedAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [connecting, setConnecting] = useState(null);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+// Type definitions
+interface ConnectedAccount {
+  id: string;
+  platform: string;
+  username: string;
+  is_active: boolean;
+  followers_count: number;
+  engagement_rate: number;
+  last_sync: string;
+  created_at: string;
+}
+
+interface Platform {
+  id: string;
+  name: string;
+  icon: () => JSX.Element;
+  color: string;
+  description: string;
+  features: string[];
+  comingSoon?: boolean;
+}
+
+interface OAuthResponse {
+  oauth_url: string;
+  state: string;
+}
+
+interface ConnectionResponse {
+  message: string;
+  account: ConnectedAccount;
+}
+
+interface AccountsResponse {
+  accounts: ConnectedAccount[];
+}
+
+const SocialMediaConnector: React.FC = () => {
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Mock API service - replace with your actual API calls
   const ApiService = {
-    async getConnectedAccounts() {
+    async getConnectedAccounts(): Promise<AccountsResponse> {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return {
         accounts: [
@@ -38,11 +72,11 @@ const SocialMediaConnector = () => {
       };
     },
 
-    async initiateOAuth(platform) {
+    async initiateOAuth(platform: string): Promise<OAuthResponse> {
       await new Promise(resolve => setTimeout(resolve, 800));
       
       // Simulate OAuth initiation
-      const mockUrls = {
+      const mockUrls: Record<string, string> = {
         instagram: 'https://api.instagram.com/oauth/authorize?client_id=mock&response_type=code&scope=instagram_basic',
         youtube: 'https://accounts.google.com/oauth2/auth?client_id=mock&response_type=code&scope=youtube.readonly'
       };
@@ -53,11 +87,11 @@ const SocialMediaConnector = () => {
       };
     },
 
-    async handleOAuthCallback(platform, code, state) {
+    async handleOAuthCallback(platform: string, code: string, state: string): Promise<ConnectionResponse> {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Simulate successful connection
-      const mockAccount = {
+      const mockAccount: ConnectedAccount = {
         id: Date.now().toString(),
         platform,
         username: platform === 'instagram' ? 'new_instagram_account' : 'New YouTube Channel',
@@ -74,18 +108,18 @@ const SocialMediaConnector = () => {
       };
     },
 
-    async disconnectAccount(accountId) {
+    async disconnectAccount(accountId: string): Promise<{ message: string }> {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return { message: 'Account disconnected successfully' };
     },
 
-    async triggerSync(accountId) {
+    async triggerSync(accountId: string): Promise<{ message: string }> {
       await new Promise(resolve => setTimeout(resolve, 1500));
       return { message: 'Sync completed successfully' };
     }
   };
 
-  const platforms = [
+  const platforms: Platform[] = [
     {
       id: 'instagram',
       name: 'Instagram Business',
@@ -125,7 +159,7 @@ const SocialMediaConnector = () => {
     }
   ];
 
-  const fetchConnectedAccounts = async () => {
+  const fetchConnectedAccounts = async (): Promise<void> => {
     try {
       setError(null);
       const data = await ApiService.getConnectedAccounts();
@@ -138,7 +172,7 @@ const SocialMediaConnector = () => {
     }
   };
 
-  const handleConnect = async (platform) => {
+  const handleConnect = async (platform: string): Promise<void> => {
     try {
       setConnecting(platform);
       setError(null);
@@ -166,7 +200,7 @@ const SocialMediaConnector = () => {
     }
   };
 
-  const handleDisconnect = async (accountId, username) => {
+  const handleDisconnect = async (accountId: string, username: string): Promise<void> => {
     if (!window.confirm(`Are you sure you want to disconnect ${username}? This will stop data collection but preserve historical data.`)) {
       return;
     }
@@ -186,7 +220,7 @@ const SocialMediaConnector = () => {
     }
   };
 
-  const handleSync = async (accountId) => {
+  const handleSync = async (accountId: string): Promise<void> => {
     try {
       setError(null);
       await ApiService.triggerSync(accountId);
@@ -208,10 +242,10 @@ const SocialMediaConnector = () => {
     }
   };
 
-  const formatTime = (dateString) => {
+  const formatTime = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / 1000 / 60);
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 1000 / 60);
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
@@ -219,13 +253,13 @@ const SocialMediaConnector = () => {
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
-  const formatNumber = (num) => {
+  const formatNumber = (num: number): string => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toLocaleString();
   };
 
-  const getConnectedAccount = (platformId) => {
+  const getConnectedAccount = (platformId: string): ConnectedAccount | undefined => {
     return connectedAccounts.find(account => account.platform === platformId);
   };
 

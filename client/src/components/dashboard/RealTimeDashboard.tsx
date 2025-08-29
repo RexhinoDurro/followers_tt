@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type JSX } from 'react';
 import { 
   Users, 
   TrendingUp, 
@@ -7,22 +7,49 @@ import {
   RefreshCw, 
   Plus, 
   Wifi, 
-  WifiOff,
-  Instagram,
-  Youtube
+  WifiOff
 } from 'lucide-react';
 
-const RealTimeDashboard = () => {
-  const [accounts, setAccounts] = useState([]);
-  const [metrics, setMetrics] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [error, setError] = useState(null);
+// Type definitions
+interface Account {
+  id: string;
+  platform: string;
+  username: string;
+  is_active: boolean;
+  followers_count: number;
+  engagement_rate: number;
+  posts_count: number;
+  last_sync: string;
+}
+
+interface Metric {
+  account: {
+    id: string;
+    platform: string;
+    username: string;
+  };
+  followers_count: number;
+  engagement_rate: number;
+  reach: number;
+  daily_growth: number;
+}
+
+interface ApiResponse<T> {
+  accounts?: T[];
+  data?: T[];
+}
+
+const RealTimeDashboard: React.FC = () => {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Mock API service - replace with your actual API calls
   const ApiService = {
-    async getConnectedAccounts() {
+    async getConnectedAccounts(): Promise<ApiResponse<Account>> {
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -52,7 +79,7 @@ const RealTimeDashboard = () => {
       };
     },
 
-    async getRealTimeMetrics() {
+    async getRealTimeMetrics(): Promise<ApiResponse<Metric>> {
       await new Promise(resolve => setTimeout(resolve, 800));
       
       return {
@@ -75,13 +102,13 @@ const RealTimeDashboard = () => {
       };
     },
 
-    async triggerManualSync(accountId) {
+    async triggerManualSync(accountId: string): Promise<{ message: string }> {
       await new Promise(resolve => setTimeout(resolve, 2000));
       return { message: 'Sync completed successfully' };
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (): Promise<void> => {
     try {
       setError(null);
       const [accountsData, metricsData] = await Promise.all([
@@ -89,8 +116,8 @@ const RealTimeDashboard = () => {
         ApiService.getRealTimeMetrics()
       ]);
 
-      setAccounts(accountsData.accounts);
-      setMetrics(metricsData.data);
+      setAccounts(accountsData.accounts || []);
+      setMetrics(metricsData.data || []);
       setLastUpdated(new Date());
     } catch (err) {
       setError('Failed to fetch dashboard data');
@@ -100,7 +127,7 @@ const RealTimeDashboard = () => {
     }
   };
 
-  const handleManualSync = async (accountId) => {
+  const handleManualSync = async (accountId: string): Promise<void> => {
     try {
       setSyncing(true);
       await ApiService.triggerManualSync(accountId);
@@ -121,8 +148,7 @@ const RealTimeDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const getPlatformIcon = (platform) => {
-    const iconClass = "w-6 h-6";
+  const getPlatformIcon = (platform: string): JSX.Element => {
     switch (platform) {
       case 'instagram':
         return <div className="w-6 h-6 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">IG</div>;
@@ -135,7 +161,7 @@ const RealTimeDashboard = () => {
     }
   };
 
-  const formatNumber = (num) => {
+  const formatNumber = (num: number): string => {
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
     }
@@ -145,10 +171,10 @@ const RealTimeDashboard = () => {
     return num.toLocaleString();
   };
 
-  const formatTime = (dateString) => {
+  const formatTime = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / 1000 / 60);
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 1000 / 60);
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;

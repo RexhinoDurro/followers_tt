@@ -93,6 +93,131 @@ def handle_instagram_callback(request):
             return Response({'error': 'Failed to get access token'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
+        # Get long-lived token
+        service = InstagramService(None)
+        long_lived_token = service.get_long_lived_token(token_result['access_token'])
+        
+        # Get user info
+        user_info_url = f"https://graph.facebook.com/v18.0/me?fields=id,username&access_token={long_lived_token['access_token']}"
+        user_response = requests.get(user_info_url)
+        user_response.raise_for_status()
+        user_data = user_response.json()
+        
+        # Save social media account
+        client = request.user.client_profile
+        
+        account, created = SocialMediaAccount.objects.update_or_create(
+            client=client,
+            platform='instagram',
+            account_id=user_data['id'],
+            defaults={
+                'username': user_data.get('username', 'Unknown'),
+                'access_token': long_lived_token['access_token'],  # Will be encrypted in save()
+                'token_expires_at': timezone.now() + timedelta(seconds=long_lived_token['expires_in']),
+                'is_active': True
+            }
+        )
+        
+        # Clean up session
+        if 'oauth_state_instagram' in request.session:
+            del request.session['oauth_state_instagram']
+        
+        # Trigger initial data sync
+        sync_instagram_data.delay(str(account.id))
+        
+        return Response({
+            'message': 'Instagram account connected successfully',
+            'account': {
+                'id': str(account.id),
+                'platform': account.platform,
+                'username': account.username,
+                'created': created
+            }
+        })
+        
+    except requests.RequestException as e:
+        logger.error(f"Instagram OAuth API error: {str(e)}")
+        return Response({'error': 'Failed to connect Instagram account'}, 
+                      status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Instagram OAuth callback error: {str(e)}")
+        return Response({'error': 'Internal server error'}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def initiate_youtube_oauth(request):
+    """Initiate YouTube OAuth flow"""
+    try:
+        if request.user.role != 'client':
+            return Response({'error': 'Only clients can connect social accounts'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Generate state parameter for security
+        state = secrets.token_urlsafe(32)
+        
+        # Store state in session
+        request.session[f'oauth_state_youtube'] = state
+        
+        # Build Google OAuth URL
+        params = {
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
+            'scope': 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly',
+            'response_type': 'code',
+            'access_type': 'offline',
+            'prompt': 'consent',
+            'state': state
+        }
+        
+        oauth_url = f"https://accounts.google.com/oauth2/auth?{urlencode(params)}"
+        
+        return Response({
+            'oauth_url': oauth_url,
+            'state': state
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to initiate YouTube OAuth: {str(e)}")
+        return Response({'error': 'Failed to initiate OAuth'}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def handle_youtube_callback(request):
+    """Handle YouTube OAuth callback"""
+    try:
+        code = request.data.get('code')
+        state = request.data.get('state')
+        
+        if not code:
+            return Response({'error': 'Authorization code is required'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verify state parameter
+        stored_state = request.session.get('oauth_state_youtube')
+        if not stored_state or stored_state != state:
+            return Response({'error': 'Invalid state parameter'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Exchange code for tokens
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'client_secret': settings.GOOGLE_CLIENT_SECRET,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
+        }
+        
+        token_response = requests.post(token_url, data=token_data)
+        token_response.raise_for_status()
+        token_result = token_response.json()
+        
+        if 'access_token' not in token_result:
+            return Response({'error': 'Failed to get access token'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
         # Get YouTube channel info
         from googleapiclient.discovery import build
         from google.oauth2.credentials import Credentials
@@ -353,129 +478,4 @@ def get_sync_status(request, account_id):
     except Exception as e:
         logger.error(f"Failed to get sync status for account {account_id}: {str(e)}")
         return Response({'error': 'Internal server error'}, 
-                      status=status.HTTP_500_INTERNAL_SERVER_ERROR) 'Failed to get access token'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
-        
-        # Get long-lived token
-        service = InstagramService(None)
-        long_lived_token = service.get_long_lived_token(token_result['access_token'])
-        
-        # Get user info
-        user_info_url = f"https://graph.facebook.com/v18.0/me?fields=id,username&access_token={long_lived_token['access_token']}"
-        user_response = requests.get(user_info_url)
-        user_response.raise_for_status()
-        user_data = user_response.json()
-        
-        # Save social media account
-        client = request.user.client_profile
-        
-        account, created = SocialMediaAccount.objects.update_or_create(
-            client=client,
-            platform='instagram',
-            account_id=user_data['id'],
-            defaults={
-                'username': user_data.get('username', 'Unknown'),
-                'access_token': long_lived_token['access_token'],  # Will be encrypted in save()
-                'token_expires_at': timezone.now() + timedelta(seconds=long_lived_token['expires_in']),
-                'is_active': True
-            }
-        )
-        
-        # Clean up session
-        if 'oauth_state_instagram' in request.session:
-            del request.session['oauth_state_instagram']
-        
-        # Trigger initial data sync
-        sync_instagram_data.delay(str(account.id))
-        
-        return Response({
-            'message': 'Instagram account connected successfully',
-            'account': {
-                'id': str(account.id),
-                'platform': account.platform,
-                'username': account.username,
-                'created': created
-            }
-        })
-        
-    except requests.RequestException as e:
-        logger.error(f"Instagram OAuth API error: {str(e)}")
-        return Response({'error': 'Failed to connect Instagram account'}, 
-                      status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        logger.error(f"Instagram OAuth callback error: {str(e)}")
-        return Response({'error': 'Internal server error'}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def initiate_youtube_oauth(request):
-    """Initiate YouTube OAuth flow"""
-    try:
-        if request.user.role != 'client':
-            return Response({'error': 'Only clients can connect social accounts'}, 
-                          status=status.HTTP_403_FORBIDDEN)
-        
-        # Generate state parameter for security
-        state = secrets.token_urlsafe(32)
-        
-        # Store state in session
-        request.session[f'oauth_state_youtube'] = state
-        
-        # Build Google OAuth URL
-        params = {
-            'client_id': settings.GOOGLE_CLIENT_ID,
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
-            'scope': 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly',
-            'response_type': 'code',
-            'access_type': 'offline',
-            'prompt': 'consent',
-            'state': state
-        }
-        
-        oauth_url = f"https://accounts.google.com/oauth2/auth?{urlencode(params)}"
-        
-        return Response({
-            'oauth_url': oauth_url,
-            'state': state
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to initiate YouTube OAuth: {str(e)}")
-        return Response({'error': 'Failed to initiate OAuth'}, 
-                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def handle_youtube_callback(request):
-    """Handle YouTube OAuth callback"""
-    try:
-        code = request.data.get('code')
-        state = request.data.get('state')
-        
-        if not code:
-            return Response({'error': 'Authorization code is required'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
-        
-        # Verify state parameter
-        stored_state = request.session.get('oauth_state_youtube')
-        if not stored_state or stored_state != state:
-            return Response({'error': 'Invalid state parameter'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
-        
-        # Exchange code for tokens
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            'client_id': settings.GOOGLE_CLIENT_ID,
-            'client_secret': settings.GOOGLE_CLIENT_SECRET,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
-        }
-        
-        token_response = requests.post(token_url, data=token_data)
-        token_response.raise_for_status()
-        token_result = token_response.json()
-        
-        if 'access_token' not in token_result:
-            return Response({'error':
