@@ -302,6 +302,7 @@ const ClientOverview: React.FC = () => {
     }
   };
 
+  
   useEffect(() => {
     if (user?.role === 'client') {
       fetchData();

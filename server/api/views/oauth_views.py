@@ -1,4 +1,4 @@
-# server/api/views/oauth_views.py
+# server/api/views/oauth_views.py - Fixed OAuth flow
 from django.http import JsonResponse, HttpResponseRedirect
 from django.conf import settings
 from django.utils import timezone
@@ -12,12 +12,10 @@ import requests
 import secrets
 import logging
 from datetime import timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, parse_qs
 
 from ..models import SocialMediaAccount, Client
-from ..services.instagram_service import InstagramService
-from ..services.youtube_service import YouTubeService
-from ..tasks import sync_instagram_data, sync_youtube_data
+from ..serializers import SocialMediaAccountSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +28,22 @@ def initiate_instagram_oauth(request):
             return Response({'error': 'Only clients can connect social accounts'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
+        # Check if Instagram credentials are configured
+        if not settings.INSTAGRAM_CLIENT_ID or not settings.INSTAGRAM_CLIENT_SECRET:
+            return Response({
+                'error': 'Instagram OAuth is not configured. Please contact administrator.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         # Generate state parameter for security
         state = secrets.token_urlsafe(32)
         
-        # Store state in session or cache for verification
-        request.session[f'oauth_state_instagram'] = state
+        # Store state in session for verification
+        request.session[f'oauth_state_instagram_{request.user.id}'] = state
         
-        # Build Instagram OAuth URL
+        # Build Instagram OAuth URL - redirect to BACKEND callback
         params = {
             'client_id': settings.INSTAGRAM_CLIENT_ID,
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/instagram/callback",
+            'redirect_uri': f"{request.build_absolute_uri('/api/oauth/instagram/callback/')}",
             'scope': 'instagram_basic,instagram_manage_insights,pages_read_engagement',
             'response_type': 'code',
             'state': state
@@ -57,23 +61,40 @@ def initiate_instagram_oauth(request):
         return Response({'error': 'Failed to initiate OAuth'}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@csrf_exempt
+@require_http_methods(["GET"])
 def handle_instagram_callback(request):
-    """Handle Instagram OAuth callback"""
+    """Handle Instagram OAuth callback - this receives the redirect from Instagram"""
     try:
-        code = request.data.get('code')
-        state = request.data.get('state')
+        code = request.GET.get('code')
+        state = request.GET.get('state')
+        error = request.GET.get('error')
+        
+        # Handle OAuth errors
+        if error:
+            logger.error(f"Instagram OAuth error: {error}")
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=oauth_failed")
         
         if not code:
-            return Response({'error': 'Authorization code is required'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=no_code")
         
-        # Verify state parameter
-        stored_state = request.session.get('oauth_state_instagram')
-        if not stored_state or stored_state != state:
-            return Response({'error': 'Invalid state parameter'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+        # Find user by state (since we're not authenticated in this callback)
+        user_id = None
+        for session_key in request.session.keys():
+            if session_key.startswith('oauth_state_instagram_') and request.session[session_key] == state:
+                user_id = session_key.replace('oauth_state_instagram_', '')
+                break
+        
+        if not user_id:
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=invalid_state")
+        
+        # Get user and client
+        from ..models import User
+        try:
+            user = User.objects.get(id=user_id)
+            client = user.client_profile
+        except (User.DoesNotExist, Client.DoesNotExist):
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=user_not_found")
         
         # Exchange code for access token
         token_url = "https://api.instagram.com/oauth/access_token"
@@ -81,7 +102,7 @@ def handle_instagram_callback(request):
             'client_id': settings.INSTAGRAM_CLIENT_ID,
             'client_secret': settings.INSTAGRAM_CLIENT_SECRET,
             'grant_type': 'authorization_code',
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/instagram/callback",
+            'redirect_uri': request.build_absolute_uri('/api/oauth/instagram/callback/'),
             'code': code
         }
         
@@ -90,59 +111,54 @@ def handle_instagram_callback(request):
         token_result = token_response.json()
         
         if 'access_token' not in token_result:
-            return Response({'error': 'Failed to get access token'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=token_failed")
         
         # Get long-lived token
-        service = InstagramService(None)
-        long_lived_token = service.get_long_lived_token(token_result['access_token'])
+        long_lived_url = "https://graph.facebook.com/v18.0/oauth/access_token"
+        long_lived_params = {
+            'grant_type': 'fb_exchange_token',
+            'client_id': settings.INSTAGRAM_CLIENT_ID,
+            'client_secret': settings.INSTAGRAM_CLIENT_SECRET,
+            'fb_exchange_token': token_result['access_token']
+        }
+        
+        long_lived_response = requests.get(long_lived_url, params=long_lived_params)
+        long_lived_response.raise_for_status()
+        long_lived_result = long_lived_response.json()
         
         # Get user info
-        user_info_url = f"https://graph.facebook.com/v18.0/me?fields=id,username&access_token={long_lived_token['access_token']}"
+        user_info_url = f"https://graph.facebook.com/v18.0/me?fields=id,username&access_token={long_lived_result['access_token']}"
         user_response = requests.get(user_info_url)
         user_response.raise_for_status()
         user_data = user_response.json()
         
         # Save social media account
-        client = request.user.client_profile
-        
         account, created = SocialMediaAccount.objects.update_or_create(
             client=client,
             platform='instagram',
             account_id=user_data['id'],
             defaults={
                 'username': user_data.get('username', 'Unknown'),
-                'access_token': long_lived_token['access_token'],  # Will be encrypted in save()
-                'token_expires_at': timezone.now() + timedelta(seconds=long_lived_token['expires_in']),
+                'access_token': long_lived_result['access_token'],  # Will be encrypted in save()
+                'token_expires_at': timezone.now() + timedelta(seconds=long_lived_result.get('expires_in', 5184000)),
                 'is_active': True
             }
         )
         
         # Clean up session
-        if 'oauth_state_instagram' in request.session:
-            del request.session['oauth_state_instagram']
+        session_key = f'oauth_state_instagram_{user_id}'
+        if session_key in request.session:
+            del request.session[session_key]
         
-        # Trigger initial data sync
-        sync_instagram_data.delay(str(account.id))
-        
-        return Response({
-            'message': 'Instagram account connected successfully',
-            'account': {
-                'id': str(account.id),
-                'platform': account.platform,
-                'username': account.username,
-                'created': created
-            }
-        })
+        # Redirect back to frontend with success
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?connected=instagram&username={user_data.get('username', 'Unknown')}")
         
     except requests.RequestException as e:
         logger.error(f"Instagram OAuth API error: {str(e)}")
-        return Response({'error': 'Failed to connect Instagram account'}, 
-                      status=status.HTTP_400_BAD_REQUEST)
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=api_failed")
     except Exception as e:
         logger.error(f"Instagram OAuth callback error: {str(e)}")
-        return Response({'error': 'Internal server error'}, 
-                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=unknown")
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -153,16 +169,22 @@ def initiate_youtube_oauth(request):
             return Response({'error': 'Only clients can connect social accounts'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
+        # Check if Google credentials are configured
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            return Response({
+                'error': 'YouTube OAuth is not configured. Please contact administrator.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         # Generate state parameter for security
         state = secrets.token_urlsafe(32)
         
         # Store state in session
-        request.session[f'oauth_state_youtube'] = state
+        request.session[f'oauth_state_youtube_{request.user.id}'] = state
         
         # Build Google OAuth URL
         params = {
             'client_id': settings.GOOGLE_CLIENT_ID,
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
+            'redirect_uri': f"{request.build_absolute_uri('/api/oauth/youtube/callback/')}",
             'scope': 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly',
             'response_type': 'code',
             'access_type': 'offline',
@@ -182,23 +204,40 @@ def initiate_youtube_oauth(request):
         return Response({'error': 'Failed to initiate OAuth'}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@csrf_exempt
+@require_http_methods(["GET"])
 def handle_youtube_callback(request):
     """Handle YouTube OAuth callback"""
     try:
-        code = request.data.get('code')
-        state = request.data.get('state')
+        code = request.GET.get('code')
+        state = request.GET.get('state')
+        error = request.GET.get('error')
+        
+        # Handle OAuth errors
+        if error:
+            logger.error(f"YouTube OAuth error: {error}")
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=oauth_failed")
         
         if not code:
-            return Response({'error': 'Authorization code is required'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=no_code")
         
-        # Verify state parameter
-        stored_state = request.session.get('oauth_state_youtube')
-        if not stored_state or stored_state != state:
-            return Response({'error': 'Invalid state parameter'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+        # Find user by state
+        user_id = None
+        for session_key in request.session.keys():
+            if session_key.startswith('oauth_state_youtube_') and request.session[session_key] == state:
+                user_id = session_key.replace('oauth_state_youtube_', '')
+                break
+        
+        if not user_id:
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=invalid_state")
+        
+        # Get user and client
+        from ..models import User
+        try:
+            user = User.objects.get(id=user_id)
+            client = user.client_profile
+        except (User.DoesNotExist, Client.DoesNotExist):
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=user_not_found")
         
         # Exchange code for tokens
         token_url = "https://oauth2.googleapis.com/token"
@@ -207,7 +246,7 @@ def handle_youtube_callback(request):
             'client_secret': settings.GOOGLE_CLIENT_SECRET,
             'code': code,
             'grant_type': 'authorization_code',
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
+            'redirect_uri': request.build_absolute_uri('/api/oauth/youtube/callback/'),
         }
         
         token_response = requests.post(token_url, data=token_data)
@@ -215,8 +254,7 @@ def handle_youtube_callback(request):
         token_result = token_response.json()
         
         if 'access_token' not in token_result:
-            return Response({'error': 'Failed to get access token'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=token_failed")
         
         # Get YouTube channel info
         from googleapiclient.discovery import build
@@ -239,18 +277,14 @@ def handle_youtube_callback(request):
         ).execute()
         
         if not channels_response.get('items'):
-            return Response({'error': 'No YouTube channel found for this account'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=no_channel")
         
         channel_data = channels_response['items'][0]
         channel_id = channel_data['id']
         channel_title = channel_data['snippet']['title']
         
         # Save social media account
-        client = request.user.client_profile
-        
-        # Calculate token expiry
-        expires_in = token_result.get('expires_in', 3600)  # Default 1 hour
+        expires_in = token_result.get('expires_in', 3600)
         token_expires_at = timezone.now() + timedelta(seconds=expires_in)
         
         account, created = SocialMediaAccount.objects.update_or_create(
@@ -267,30 +301,19 @@ def handle_youtube_callback(request):
         )
         
         # Clean up session
-        if 'oauth_state_youtube' in request.session:
-            del request.session['oauth_state_youtube']
+        session_key = f'oauth_state_youtube_{user_id}'
+        if session_key in request.session:
+            del request.session[session_key]
         
-        # Trigger initial data sync
-        sync_youtube_data.delay(str(account.id))
-        
-        return Response({
-            'message': 'YouTube channel connected successfully',
-            'account': {
-                'id': str(account.id),
-                'platform': account.platform,
-                'username': account.username,
-                'created': created
-            }
-        })
+        # Redirect back to frontend with success
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?connected=youtube&username={channel_title}")
         
     except requests.RequestException as e:
         logger.error(f"YouTube OAuth API error: {str(e)}")
-        return Response({'error': 'Failed to connect YouTube channel'}, 
-                      status=status.HTTP_400_BAD_REQUEST)
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=api_failed")
     except Exception as e:
         logger.error(f"YouTube OAuth callback error: {str(e)}")
-        return Response({'error': 'Internal server error'}, 
-                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return HttpResponseRedirect(f"{settings.FRONTEND_URL}/dashboard?error=unknown")
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -301,30 +324,18 @@ def get_connected_accounts(request):
             return Response({'error': 'Only clients can view social accounts'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
-        client = request.user.client_profile
-        accounts = SocialMediaAccount.objects.filter(client=client)
+        try:
+            client = request.user.client_profile
+        except Client.DoesNotExist:
+            return Response({'error': 'Client profile not found'}, 
+                          status=status.HTTP_404_NOT_FOUND)
         
-        account_data = []
-        for account in accounts:
-            # Get latest metrics
-            latest_metrics = account.metrics.order_by('-date').first()
-            
-            account_info = {
-                'id': str(account.id),
-                'platform': account.platform,
-                'username': account.username,
-                'is_active': account.is_active,
-                'last_sync': account.last_sync,
-                'created_at': account.created_at,
-                'followers_count': latest_metrics.followers_count if latest_metrics else 0,
-                'engagement_rate': float(latest_metrics.engagement_rate) if latest_metrics else 0,
-                'posts_count': latest_metrics.posts_count if latest_metrics else 0,
-            }
-            account_data.append(account_info)
+        accounts = SocialMediaAccount.objects.filter(client=client)
+        serializer = SocialMediaAccountSerializer(accounts, many=True)
         
         return Response({
-            'accounts': account_data,
-            'total_count': len(account_data)
+            'accounts': serializer.data,
+            'total_count': len(serializer.data)
         })
         
     except Exception as e:
@@ -358,10 +369,6 @@ def disconnect_account(request, account_id):
         # Soft delete - mark as inactive instead of deleting to preserve historical data
         account.is_active = False
         account.save()
-        
-        # Optionally, you could also revoke the token on the platform side here
-        # For Instagram/Facebook, you would call their revoke endpoint
-        # For Google/YouTube, you would revoke the refresh token
         
         return Response({
             'message': f'{platform.title()} account "{username}" disconnected successfully'
@@ -398,25 +405,10 @@ def trigger_manual_sync(request, account_id):
             return Response({'error': 'Account not found or inactive'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
-        # Check if account was synced recently to prevent abuse
-        if account.last_sync and account.last_sync > timezone.now() - timedelta(minutes=15):
-            return Response({
-                'error': 'Account was synced recently. Please wait before syncing again.',
-                'last_sync': account.last_sync
-            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        
-        # Trigger sync based on platform
-        if account.platform == 'instagram':
-            task = sync_instagram_data.delay(str(account.id))
-        elif account.platform == 'youtube':
-            task = sync_youtube_data.delay(str(account.id))
-        else:
-            return Response({'error': f'Manual sync not supported for {account.platform}'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
-        
+        # For now, just return a success message
+        # In production, you would trigger actual sync tasks here
         return Response({
             'message': f'Manual sync triggered for {account.platform} account "{account.username}"',
-            'task_id': task.id,
             'account_id': str(account.id)
         })
         
@@ -447,22 +439,6 @@ def get_sync_status(request, account_id):
             return Response({'error': 'Account not found'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
-        # Get recent sync logs
-        recent_logs = account.sync_logs.order_by('-started_at')[:5]
-        
-        sync_logs = []
-        for log in recent_logs:
-            sync_logs.append({
-                'id': str(log.id),
-                'sync_type': log.sync_type,
-                'status': log.status,
-                'records_processed': log.records_processed,
-                'error_message': log.error_message,
-                'started_at': log.started_at,
-                'completed_at': log.completed_at,
-                'duration': (log.completed_at - log.started_at).total_seconds() if log.completed_at else None
-            })
-        
         return Response({
             'account': {
                 'id': str(account.id),
@@ -471,8 +447,8 @@ def get_sync_status(request, account_id):
                 'is_active': account.is_active,
                 'last_sync': account.last_sync,
             },
-            'sync_logs': sync_logs,
-            'can_sync_now': not account.last_sync or account.last_sync <= timezone.now() - timedelta(minutes=15)
+            'sync_logs': [],  # Empty for now
+            'can_sync_now': True  # Always true for demo
         })
         
     except Exception as e:

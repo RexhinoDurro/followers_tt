@@ -6,7 +6,8 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import (
     User, Client, Task, ContentPost, PerformanceData, 
-    Message, Invoice, TeamMember, Project, File, Notification
+    Message, Invoice, TeamMember, Project, File, Notification,
+    SocialMediaAccount, RealTimeMetrics  # Add these imports
 )
 
 class UserSerializer(serializers.ModelSerializer):
@@ -71,6 +72,58 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Must include email and password.')
 
         return data
+
+# ADD MISSING SOCIAL MEDIA SERIALIZERS
+class SocialMediaAccountSerializer(serializers.ModelSerializer):
+    """Social Media Account serializer"""
+    client_name = serializers.CharField(source='client.name', read_only=True)
+    
+    class Meta:
+        model = SocialMediaAccount
+        fields = [
+            'id', 'client', 'client_name', 'platform', 'account_id',
+            'username', 'is_active', 'last_sync', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'last_sync']
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        
+        # Get latest metrics
+        try:
+            latest_metrics = RealTimeMetrics.objects.filter(
+                account=instance
+            ).order_by('-date').first()
+            
+            if latest_metrics:
+                data['followers_count'] = latest_metrics.followers_count
+                data['engagement_rate'] = float(latest_metrics.engagement_rate)
+                data['posts_count'] = latest_metrics.posts_count
+            else:
+                data['followers_count'] = 0
+                data['engagement_rate'] = 0
+                data['posts_count'] = 0
+        except:
+            data['followers_count'] = 0
+            data['engagement_rate'] = 0
+            data['posts_count'] = 0
+            
+        return data
+
+class RealTimeMetricsSerializer(serializers.ModelSerializer):
+    """Real-time metrics serializer"""
+    account_username = serializers.CharField(source='account.username', read_only=True)
+    account_platform = serializers.CharField(source='account.platform', read_only=True)
+    
+    class Meta:
+        model = RealTimeMetrics
+        fields = [
+            'id', 'account', 'account_username', 'account_platform', 'date',
+            'followers_count', 'following_count', 'posts_count', 'engagement_rate',
+            'reach', 'impressions', 'profile_views', 'website_clicks',
+            'daily_growth', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
 
 class ClientSerializer(serializers.ModelSerializer):
     """Client serializer"""
