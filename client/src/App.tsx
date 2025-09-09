@@ -1,15 +1,14 @@
-// client/src/App.tsx - Updated with Backend Integration and Auth Context
+// client/src/App.tsx - Updated with Notification System and Fixed Dashboard Routing
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DashboardLayout } from './dashboard/DashboardLayout';
+import { NotificationProvider } from './context/NotificationContext';
+import { DashboardRouter } from './dashboard/DashboardRouter';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 
 // Import pages
 import { AuthForm } from './pages/auth/AuthForm';
-import AdminOverview from './dashboard/admin/AdminOverview';
-import ClientOverview from './dashboard/client/ClientOverview';
 import HomePage from './pages/HomePage';
 import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
@@ -64,21 +63,6 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-// Dashboard Route Component
-const DashboardRoute: React.FC = () => {
-  const { user, logout } = useAuth();
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return (
-    <DashboardLayout user={user} onLogout={logout}>
-      {user.role === 'admin' ? <AdminOverview /> : <ClientOverview />}
-    </DashboardLayout>
-  );
-};
-
 // Auth Form Page Component
 const AuthFormPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -104,7 +88,7 @@ const AuthFormPage: React.FC = () => {
   );
 };
 
-// Main App Component
+// Main App Content Component
 const AppContent: React.FC = () => {
   const { user } = useAuth();
 
@@ -260,27 +244,16 @@ const AppContent: React.FC = () => {
           </PublicRoute>
         } />
         
-        {/* Protected Dashboard Routes */}
+        {/* Protected Dashboard Route - Uses DashboardRouter for internal navigation */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
-            <DashboardRoute />
+            <DashboardRouter />
           </ProtectedRoute>
         } />
         
-        <Route path="/dashboard/admin" element={
-          <ProtectedRoute>
-            <DashboardLayout user={user} onLogout={() => {}}>
-              <AdminOverview />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/dashboard/client" element={
-          <ProtectedRoute>
-            <DashboardLayout user={user} onLogout={() => {}}>
-              <ClientOverview />
-            </DashboardLayout>
-          </ProtectedRoute>
+        {/* Catch all dashboard sub-routes and redirect to main dashboard */}
+        <Route path="/dashboard/*" element={
+          <Navigate to="/dashboard" replace />
         } />
         
         {/* 404 Route */}
@@ -290,11 +263,13 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Main App with Auth Provider
+// Main App with Auth and Notification Providers
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </AuthProvider>
   );
 }

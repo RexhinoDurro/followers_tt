@@ -1,4 +1,4 @@
-// client/src/components/layout/DashboardLayout.tsx - Updated with Fixed Types
+// client/src/dashboard/DashboardLayout.tsx - Updated with Working Notifications
 import React, { useState } from 'react';
 import { 
   User, 
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { AuthUser } from '../types';
 import { Button } from '../components/ui';
+import { NotificationDropdown } from '../components/NotificationDropdown';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -58,6 +59,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
   // Get display name with fallback
   const displayName = user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email;
 
+  // Get current active page from hash
+  const currentHash = window.location.hash || '#overview';
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -73,16 +77,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
         </div>
         
         <nav className="mt-8">
-          {navigation.map((item) => (
-            <a
-              key={item.name}
-              href={item.href}
-              className="flex items-center px-6 py-3 text-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-r-2 hover:border-purple-600 transition-all duration-200"
-            >
-              <item.icon className="w-5 h-5 mr-3" />
-              {item.name}
-            </a>
-          ))}
+          {navigation.map((item) => {
+            const isActive = currentHash === item.href;
+            return (
+              <a
+                key={item.name}
+                href={item.href}
+                className={`flex items-center px-6 py-3 text-gray-700 transition-all duration-200 ${
+                  isActive
+                    ? 'bg-purple-50 text-purple-600 border-r-2 border-purple-600'
+                    : 'hover:bg-purple-50 hover:text-purple-600 hover:border-r-2 hover:border-purple-600'
+                }`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <item.icon className="w-5 h-5 mr-3" />
+                {item.name}
+              </a>
+            );
+          })}
         </nav>
 
         {/* User Profile Section */}
@@ -123,14 +135,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
               <Menu className="w-6 h-6" />
             </button>
             
+            <div className="flex-1 px-4 lg:px-0">
+              <h2 className="text-2xl font-semibold text-gray-900">
+                {navigation.find(item => item.href === currentHash)?.name || 'Dashboard'}
+              </h2>
+            </div>
+            
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Bell className="w-6 h-6 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors" />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  3
-                </span>
-              </div>
+              {/* Notification Dropdown */}
+              <NotificationDropdown />
               
+              {/* User Avatar */}
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-gray-900">{displayName}</p>
@@ -145,8 +160,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
 

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge, Button, Modal, Input } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
-import ApiService from '../../components/services/ApiService';
+import ApiService from '../../services/ApiService';
 
 interface ClientStats {
   total_followers: number | string;
