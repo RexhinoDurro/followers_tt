@@ -2,14 +2,14 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DashboardLayout } from './components/layout/DashboardLayout';
+import { DashboardLayout } from './dashboard/DashboardLayout';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 
 // Import pages
 import { AuthForm } from './pages/auth/AuthForm';
-import AdminOverview from './pages/admin/AdminOverview';
-import ClientOverview from './pages/client/ClientOverview';
+import AdminOverview from './dashboard/admin/AdminOverview';
+import ClientOverview from './dashboard/client/ClientOverview';
 import HomePage from './pages/HomePage';
 import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
