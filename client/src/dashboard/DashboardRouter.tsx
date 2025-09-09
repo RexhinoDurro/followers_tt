@@ -8,18 +8,20 @@ import { useAuth } from '../context/AuthContext';
 import AdminOverview from './admin/AdminOverview';
 import AdminClients from './admin/AdminClients';
 import AdminTasks from './admin/AdminTasks';
-import AdminContent from './admin/AdminContent';
-import AdminPerformance from './admin/AdminPerformance';
-import AdminMessages from './admin/AdminMessages';
-import AdminInvoices from './admin/AdminInvoices';
-import AdminSettings from './admin/AdminSettings';
+import AdminContent from './admin/AdminContent.tsx';
+import { AdminPerformance } from './admin/AdminPerformance';
+import AdminMessages from './admin/AdminMessages.tsx';
+// If the file is named 'AdminInvoices.tsx', update the import:
+import AdminInvoices from './admin/AdminInvoices.tsx';
+import AdminSettings from './admin/AdminSettings.tsx';
 
 // Client Pages
 import ClientOverview from './client/ClientOverview';
 import ClientContent from './client/ClientContent';
-import ClientPerformance from './client/ClientPerformance';
-import ClientMessages from './client/ClientMessages';
-import ClientBilling from './client/ClientBilling';
+import ClientPerformance from './client/ClientPerformance.tsx';
+import ClientMessages from './client/ClientMessages.tsx';
+// If the file is named 'ClientBilling.tsx', update the import:
+import ClientBilling from './client/ClientBilling.tsx';
 
 export const DashboardRouter: React.FC = () => {
   const { user, logout } = useAuth();
