@@ -1,10 +1,10 @@
-// client/src/dashboard/admin/AdminPerformance.tsx - Complete Implementation
+// client/src/dashboard/admin/AdminPerformance.tsx - Fixed TypeScript errors
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, Users, Eye, Heart, BarChart3, Calendar,
-  Download, Filter, RefreshCw, Target, Award, Zap,
-  ArrowUp, ArrowDown, Activity, Globe, Share2, Play,
-  PieChart, LineChart, DollarSign, Clock, ChevronRight
+  TrendingUp, Users, Eye, Heart, BarChart3,
+  Download, RefreshCw, Target, Award, Zap,
+  ArrowUp, ArrowDown, Activity, Globe, Share2,
+  PieChart, DollarSign, ChevronRight
 } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -72,7 +72,6 @@ const AdminPerformance: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedClient, setSelectedClient] = useState('all');
   const [selectedTimeframe, setSelectedTimeframe] = useState('3months');
-  const [showClientReport, setShowClientReport] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'realtime' | 'analytics'>('overview');
 
   useEffect(() => {
@@ -86,15 +85,20 @@ const AdminPerformance: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [clientsData, metricsData, overviewData] = await Promise.all([
+      const [clientsData, metricsResponse, overviewData] = await Promise.all([
         ApiService.getClients(),
         ApiService.getRealTimeMetrics(),
         ApiService.getAnalyticsOverview()
       ]);
 
       setClients(Array.isArray(clientsData) ? clientsData : []);
-      setRealTimeMetrics(metricsData.data || []);
-      setAnalyticsOverview(overviewData);
+      
+      // Type the metrics response properly
+      const metricsData = metricsResponse as { data?: RealTimeMetric[] } | RealTimeMetric[];
+      setRealTimeMetrics(Array.isArray(metricsData) ? metricsData : metricsData?.data || []);
+      
+      // Type the overview data properly
+      setAnalyticsOverview(overviewData as AnalyticsOverview);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -104,8 +108,8 @@ const AdminPerformance: React.FC = () => {
 
   const fetchPerformanceData = async () => {
     try {
-      const params = selectedClient !== 'all' ? { client_id: selectedClient } : {};
-      const data = await ApiService.getPerformanceData(params);
+      const clientId = selectedClient !== 'all' ? selectedClient : undefined;
+      const data = await ApiService.getPerformanceData(clientId);
       setPerformanceData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch performance data:', error);
@@ -115,7 +119,6 @@ const AdminPerformance: React.FC = () => {
   const generateClientReport = async (clientId: string) => {
     try {
       const report = await ApiService.getClientPerformanceReport(clientId);
-      setShowClientReport(clientId);
       // In a real app, this would open a detailed report modal or download PDF
       console.log('Client report:', report);
     } catch (error) {
@@ -561,7 +564,7 @@ const AdminPerformance: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card title="Platform Distribution">
                   <div className="space-y-4">
-                    {['Instagram', 'YouTube', 'TikTok', 'Facebook'].map((platform, index) => {
+                    {['Instagram', 'YouTube', 'TikTok', 'Facebook'].map((platform) => {
                       const count = realTimeMetrics.filter(m => 
                         m.account.platform.toLowerCase() === platform.toLowerCase()
                       ).length;

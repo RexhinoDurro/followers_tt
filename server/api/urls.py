@@ -1,4 +1,4 @@
-# server/api/urls.py - Complete URL configuration
+# server/api/urls.py - Fixed URL configuration
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -59,7 +59,7 @@ router.register(r'performance', PerformanceDataViewSet, basename='performance')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'files', FileViewSet, basename='file')
-router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'notifications', NotificationViewSet, basename='notification')  # Fixed: only register once
 router.register(r'social-accounts', SocialMediaAccountViewSet, basename='social-account')
 
 urlpatterns = [
@@ -68,7 +68,6 @@ urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', logout_view, name='logout'),
     path('auth/me/', current_user_view, name='current_user'),
-    path('/notifications/', NotificationViewSet.as_view, name='notifications'),
     
     # OAuth endpoints
     path('oauth/instagram/initiate/', initiate_instagram_oauth, name='instagram_oauth_initiate'),
@@ -96,6 +95,6 @@ urlpatterns = [
     # Health check
     path('health/', health_check, name='health_check'),
     
-    # Include router URLs
+    # Include router URLs - this automatically includes notifications/
     path('', include(router.urls)),
 ]

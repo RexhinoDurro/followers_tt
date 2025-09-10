@@ -87,7 +87,7 @@ const AdminMessages: React.FC = () => {
       }));
       
       setConversations(clientConversations);
-      setClients(clientsData || []);
+      setClients(Array.isArray(clientsData) ? clientsData : []);
       
       // Auto-select first conversation if available
       if (clientConversations.length > 0) {
