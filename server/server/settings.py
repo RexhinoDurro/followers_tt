@@ -73,6 +73,20 @@ DATABASES = {
     }
 }
 
+
+# Stripe Configuration
+STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+
+# Stripe Price IDs for different packages
+STRIPE_PRICES = {
+    'starter': config('STRIPE_PRICE_STARTER', default=''),  # $1,500/month
+    'growth': config('STRIPE_PRICE_GROWTH', default=''),   # $3,000/month
+    'professional': config('STRIPE_PRICE_PROFESSIONAL', default=''),  # $5,000/month
+    'enterprise': config('STRIPE_PRICE_ENTERPRISE', default=''),  # Custom pricing
+}
+
 # For production, use PostgreSQL:
 # DATABASES = {
 #     'default': {
