@@ -32,41 +32,42 @@ const InstagramGrowthPage: React.FC = () => {
   const plans = [
     {
       name: 'Starter',
-      price: 29,
-      followers: '500-1,000',
+      price: 100,
+   
       features: [
-        'Basic hashtag research',
-        'Content optimization tips',
-        'Weekly performance reports',
-        'Email support',
-        'Safe organic growth'
+        '12 posts per month',
+        '12 interactive stories',
+        'Hashtag research',
+        'Monthly reports',
+        'ideal for small buisnesses',
       ]
     },
     {
-      name: 'Growth',
-      price: 69,
-      followers: '1,500-3,000',
+      name: 'Pro',
+      price: 250,
+ 
       features: [
-        'Advanced hashtag strategy',
-        'Content calendar planning',
-        'Competitor analysis',
-        'Daily engagement optimization',
-        'Priority support',
-        'Story engagement boost'
+        '20 posts + reels',
+        'Monthly promotional areas',
+        'boost strategies',
+        'Blo optimization',
+        'report + recommendations',
+        'Story engagement boost',
+        'aggressive boosting',
       ],
       popular: true
     },
     {
-      name: 'Pro',
-      price: 129,
-      followers: '3,000-5,000',
+      name: 'Premium',
+      price: 400,
+      
       features: [
-        'Custom content strategy',
-        'Dedicated account manager',
-        'Advanced analytics dashboard',
+        'Instagram + Facebook + TikTok',
+        '30 posts(design,reels carouse)',
+        'Advertising on a budget',
         'Influencer outreach assistance',
-        '24/7 priority support',
-        'Brand collaboration opportunities'
+        'full and professional management',
+       
       ]
     }
   ];
@@ -440,7 +441,7 @@ const InstagramGrowthPage: React.FC = () => {
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
                     <div className="text-4xl font-bold text-gray-900 mb-2">${plan.price}</div>
-                    <div className="text-gray-600 mb-4">{plan.followers} followers/month</div>
+                    <div className="text-gray-600 mb-4">{} followers/month</div>
                   </div>
 
                   <ul className="space-y-3 mb-8">
