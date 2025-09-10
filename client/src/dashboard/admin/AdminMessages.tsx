@@ -1,12 +1,9 @@
 // client/src/dashboard/admin/AdminMessages.tsx - Complete Implementation
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  MessageSquare, Send, Search, Filter, Users, Clock,
-  CheckCircle, MoreVertical, Archive, Star, Reply,
-  FileText, Image, Paperclip, Phone, Video, Trash2,
-  Edit, Forward, AlertCircle, User, ChevronLeft
+  MessageSquare, Send, Search, MoreVertical, Paperclip, Phone, Video, ChevronLeft
 } from 'lucide-react';
-import { Card, Button, Modal, Input, Badge } from '../../components/ui';
+import { Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
 
 interface Message {
@@ -71,13 +68,13 @@ const AdminMessages: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [conversationsData, clientsData] = await Promise.all([
+      const [, clientsDataRaw] = await Promise.all([
         ApiService.getConversations(),
         ApiService.getClients()
       ]);
-      
+      const clientsData: Client[] = Array.isArray(clientsDataRaw) ? clientsDataRaw : [];
       // Transform clients into conversations format
-      const clientConversations: Conversation[] = (clientsData || []).map((client: Client) => ({
+      const clientConversations: Conversation[] = clientsData.map((client: Client) => ({
         id: client.id,
         name: client.name,
         role: 'client' as const,
@@ -85,15 +82,12 @@ const AdminMessages: React.FC = () => {
         unreadCount: 0,
         avatar: client.avatar
       }));
-      
       setConversations(clientConversations);
-      setClients(Array.isArray(clientsData) ? clientsData : []);
-      
+      setClients(clientsData);
       // Auto-select first conversation if available
       if (clientConversations.length > 0) {
         setSelectedConversation(clientConversations[0]);
       }
-      
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -103,20 +97,17 @@ const AdminMessages: React.FC = () => {
 
   const fetchConversationMessages = async (userId: string) => {
     try {
-      const messagesData = await ApiService.getMessages();
-      
+      const messagesDataRaw = await ApiService.getMessages();
+      const messagesData: Message[] = Array.isArray(messagesDataRaw) ? messagesDataRaw : [];
       // Filter messages for this conversation
-      const conversationMessages = (messagesData || []).filter((msg: Message) => 
+      const conversationMessages = messagesData.filter((msg: Message) => 
         msg.sender === userId || msg.receiver === userId
       );
-      
       setMessages(conversationMessages);
-      
       // Mark messages as read
       const unreadMessages = conversationMessages.filter((msg: Message) => 
         !msg.read && msg.sender === userId
       );
-      
       for (const msg of unreadMessages) {
         try {
           await ApiService.markMessageRead(msg.id);
