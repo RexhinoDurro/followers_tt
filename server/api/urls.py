@@ -68,6 +68,7 @@ urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', logout_view, name='logout'),
     path('auth/me/', current_user_view, name='current_user'),
+    path('/notifications/', NotificationViewSet.as_view, name='notifications'),
     
     # OAuth endpoints
     path('oauth/instagram/initiate/', initiate_instagram_oauth, name='instagram_oauth_initiate'),

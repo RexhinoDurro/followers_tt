@@ -17,7 +17,7 @@ import AdminSettings from './admin/AdminSettings.tsx';
 
 // Client Pages
 import ClientOverview from './client/ClientOverview';
-import ClientContent from './client/ClientContent';
+import ClientContent from './client/ClientContent.tsx';
 import ClientPerformance from './client/ClientPerformance.tsx';
 import ClientMessages from './client/ClientMessages.tsx';
 // If the file is named 'ClientBilling.tsx', update the import:
