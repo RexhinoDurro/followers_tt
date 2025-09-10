@@ -1,4 +1,4 @@
-// pages/PricingPage.tsx
+// pages/PricingPage.tsx - Fully Responsive Version
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -236,43 +236,43 @@ const PricingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-600 to-pink-600 text-white py-20">
+      <section className="bg-gradient-to-br from-purple-600 to-pink-600 text-white py-12 sm:py-16 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 sm:mb-6">
               Simple, Transparent <span className="text-yellow-300">Pricing</span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 max-w-3xl mx-auto px-2">
               Choose the perfect plan to grow your social media presence. No hidden fees, no long-term contracts.
             </p>
-            <div className="flex justify-center items-center space-x-4">
-              <Award className="w-8 h-8 text-yellow-300" />
-              <span className="text-lg">30-day money-back guarantee on all plans</span>
+            <div className="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <Award className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-300" />
+              <span className="text-base sm:text-lg">30-day money-back guarantee on all plans</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* Platform Selection */}
-      <section className="py-12 bg-white">
+      <section className="py-8 sm:py-12 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Choose Your Platform</h2>
-            <p className="text-gray-600">Select the social media platform you want to grow</p>
+          <div className="text-center mb-6 sm:mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Choose Your Platform</h2>
+            <p className="text-gray-600 text-sm sm:text-base">Select the social media platform you want to grow</p>
           </div>
           <div className="flex justify-center">
-            <div className="bg-gray-100 p-1 rounded-lg inline-flex">
+            <div className="bg-gray-100 p-1 rounded-lg inline-flex w-full max-w-md sm:max-w-none sm:w-auto overflow-x-auto">
               {platforms.map((platform) => (
                 <button
                   key={platform.id}
                   onClick={() => setSelectedPlatform(platform.id)}
-                  className={`px-6 py-3 rounded-md font-medium transition-all duration-200 ${
+                  className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 rounded-md font-medium transition-all duration-200 text-sm sm:text-base whitespace-nowrap ${
                     selectedPlatform === platform.id
                       ? 'bg-white shadow-md text-purple-600'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  <span className="mr-2">{platform.icon}</span>
+                  <span className="mr-1 sm:mr-2">{platform.icon}</span>
                   {platform.name}
                 </button>
               ))}
@@ -282,10 +282,10 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Billing Toggle */}
-      <section className="pb-8">
+      <section className="pb-6 sm:pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-center items-center space-x-4">
-            <span className={`font-medium ${billingCycle === 'monthly' ? 'text-gray-900' : 'text-gray-500'}`}>
+          <div className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            <span className={`font-medium text-sm sm:text-base ${billingCycle === 'monthly' ? 'text-gray-900' : 'text-gray-500'}`}>
               Monthly
             </span>
             <button
@@ -300,11 +300,11 @@ const PricingPage: React.FC = () => {
                 }`}
               />
             </button>
-            <span className={`font-medium ${billingCycle === 'annual' ? 'text-gray-900' : 'text-gray-500'}`}>
+            <span className={`font-medium text-sm sm:text-base ${billingCycle === 'annual' ? 'text-gray-900' : 'text-gray-500'}`}>
               Annual
             </span>
             {billingCycle === 'annual' && (
-              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-medium">
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs sm:text-sm font-medium">
                 Save {discount}%
               </span>
             )}
@@ -313,44 +313,44 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Pricing Plans */}
-      <section className="pb-20">
+      <section className="pb-12 sm:pb-16 md:pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {currentPlans.map((plan, index) => (
               <div
                 key={plan.name}
-                className={`relative bg-white rounded-2xl shadow-xl ${plan.color} ${
-                  plan.popular ? 'transform scale-105' : ''
+                className={`relative bg-white rounded-xl sm:rounded-2xl shadow-xl ${plan.color} ${
+                  plan.popular ? 'transform scale-100 sm:scale-105' : ''
                 } transition-all duration-300 hover:shadow-2xl`}
               >
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center">
-                      <Star className="w-4 h-4 mr-1" />
+                  <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-medium flex items-center">
+                      <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                       Most Popular
                     </span>
                   </div>
                 )}
                 
-                <div className="p-8">
+                <div className="p-6 sm:p-8">
                   {/* Plan Header */}
-                  <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-4">
-                      <plan.icon className="w-8 h-8 text-white" />
+                  <div className="text-center mb-6 sm:mb-8">
+                    <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-3 sm:mb-4">
+                      <plan.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                    <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4 leading-relaxed">{plan.description}</p>
                     
                     {/* Price */}
-                    <div className="mb-4">
-                      <span className="text-4xl font-bold text-gray-900">
+                    <div className="mb-3 sm:mb-4">
+                      <span className="text-3xl sm:text-4xl font-bold text-gray-900">
                         ${plan.price[billingCycle]}
                       </span>
-                      <span className="text-gray-500 ml-1">
+                      <span className="text-gray-500 ml-1 text-sm sm:text-base">
                         /{billingCycle === 'monthly' ? 'month' : 'year'}
                       </span>
                       {billingCycle === 'annual' && (
-                        <div className="text-sm text-green-600 mt-1">
+                        <div className="text-xs sm:text-sm text-green-600 mt-1">
                           Save ${(plan.price.monthly * 12) - plan.price.annual}/year
                         </div>
                       )}
@@ -358,11 +358,11 @@ const PricingPage: React.FC = () => {
                   </div>
 
                   {/* Features */}
-                  <ul className="space-y-3 mb-8">
+                  <ul className="space-y-2 sm:space-y-3 mb-6 sm:mb-8">
                     {plan.features.map((feature, featureIndex) => (
                       <li key={featureIndex} className="flex items-start">
-                        <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-700 text-sm">{feature}</span>
+                        <Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 mr-2 sm:mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700 text-xs sm:text-sm leading-relaxed">{feature}</span>
                       </li>
                     ))}
                   </ul>
@@ -370,7 +370,7 @@ const PricingPage: React.FC = () => {
                   {/* CTA Button */}
                   <Link
                     to="/auth"
-                    className={`w-full py-3 px-4 rounded-lg font-semibold text-center transition-colors duration-200 block ${
+                    className={`w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg font-semibold text-center transition-colors duration-200 block text-sm sm:text-base ${
                       plan.popular
                         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
                         : 'bg-gray-900 text-white hover:bg-gray-800'
@@ -386,16 +386,16 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Features Comparison */}
-      <section className="py-20 bg-white">
+      <section className="py-12 sm:py-16 md:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose VISIONBOOST ?</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">Why Choose VISIONBOOST?</h2>
+            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto px-2">
               We offer more than just follower growth. Our comprehensive approach ensures long-term success.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             <FeatureHighlight
               icon={Shield}
               title="100% Safe & Compliant"
@@ -443,14 +443,14 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-            <p className="text-xl text-gray-600">Everything you need to know about our pricing and services</p>
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">Frequently Asked Questions</h2>
+            <p className="text-lg sm:text-xl text-gray-600 px-2">Everything you need to know about our pricing and services</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <FAQItem
               question="Can I change my plan anytime?"
               answer="Yes! You can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle."
@@ -476,24 +476,24 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 bg-gradient-to-r from-purple-600 to-pink-600">
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-purple-600 to-pink-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
             Ready to Start Growing?
           </h2>
-          <p className="text-xl text-white mb-8 max-w-3xl mx-auto">
+          <p className="text-lg sm:text-xl text-white mb-6 sm:mb-8 max-w-3xl mx-auto px-2">
             Join thousands of satisfied clients who have transformed their social media presence
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <Link
               to="/auth"
-              className="bg-white text-purple-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors"
+              className="bg-white text-purple-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-gray-100 transition-colors"
             >
               Start Your Free Trial
             </Link>
             <Link
               to="/contact"
-              className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-purple-600 transition-colors"
+              className="border-2 border-white text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-white hover:text-purple-600 transition-colors"
             >
               Contact Sales
             </Link>
@@ -512,12 +512,12 @@ const FeatureHighlight: React.FC<{
   color: string;
   bgColor: string;
 }> = ({ icon: Icon, title, description, color, bgColor }) => (
-  <div className="text-center p-6">
-    <div className={`${bgColor} w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4`}>
-      <Icon className={`w-8 h-8 ${color}`} />
+  <div className="text-center p-4 sm:p-6">
+    <div className={`${bgColor} w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4`}>
+      <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${color}`} />
     </div>
-    <h3 className="text-xl font-bold text-gray-900 mb-3">{title}</h3>
-    <p className="text-gray-600">{description}</p>
+    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">{title}</h3>
+    <p className="text-gray-600 text-sm sm:text-base leading-relaxed">{description}</p>
   </div>
 );
 
@@ -528,19 +528,21 @@ const FAQItem: React.FC<{ question: string; answer: string }> = ({ question, ans
   return (
     <div className="bg-white rounded-lg shadow-md">
       <button
-        className="w-full text-left p-6 focus:outline-none focus:ring-2 focus:ring-purple-500"
+        className="w-full text-left p-4 sm:p-6 focus:outline-none focus:ring-2 focus:ring-purple-500"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">{question}</h3>
-          <span className={`transform transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-            ▼
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 pr-4">{question}</h3>
+          <span className={`transform transition-transform duration-200 text-gray-500 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}>
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </span>
         </div>
       </button>
       {isOpen && (
-        <div className="px-6 pb-6">
-          <p className="text-gray-600">{answer}</p>
+        <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+          <p className="text-gray-600 text-sm sm:text-base leading-relaxed">{answer}</p>
         </div>
       )}
     </div>
