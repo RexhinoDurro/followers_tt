@@ -6,6 +6,7 @@ import {
   CheckCircle, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
+import type { FormSubmitHandler } from '../../types';
 import ApiService from '../../services/ApiService';
 
 interface Client {
@@ -75,7 +76,7 @@ const AdminClients: React.FC = () => {
     await fetchClients();
   };
 
-  const handleAddClient = async (e: React.FormEvent) => {
+  const handleAddClient: FormSubmitHandler = async (e) => {
     e.preventDefault();
     try {
       // In a real app, you would call an API endpoint to add the client
@@ -221,14 +222,14 @@ const AdminClients: React.FC = () => {
               type="text"
               placeholder="Search clients..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={((e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value))}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
             />
           </div>
           <div className="flex gap-2">
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={((e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value))}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
             >
               <option value="all">All Status</option>

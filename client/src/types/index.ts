@@ -1,5 +1,6 @@
 // client/src/types/index.ts - Complete type definitions
 import React from 'react';
+export * from './events';
 
 // Authentication & User Types
 export interface AuthUser {
