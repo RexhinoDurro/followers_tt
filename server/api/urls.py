@@ -1,4 +1,4 @@
-# server/api/urls.py - Fixed URL configuration
+# server/api/urls.py - Complete Fixed URL Configuration
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -23,6 +23,24 @@ from .views import (
     # Health check
     health_check
 )
+
+# Import message views
+try:
+    from .views.message_views import (
+        send_message_to_admin, send_message_to_client,
+        get_admin_conversations, get_conversation_messages
+    )
+    MESSAGE_VIEWS_AVAILABLE = True
+except ImportError:
+    MESSAGE_VIEWS_AVAILABLE = False
+    # Create dummy views
+    def message_not_available(request, *args, **kwargs):
+        return JsonResponse({'error': 'Message functionality not available'}, status=501)
+    
+    send_message_to_admin = message_not_available
+    send_message_to_client = message_not_available
+    get_admin_conversations = message_not_available
+    get_conversation_messages = message_not_available
 
 # Import OAuth views with error handling
 try:
@@ -59,7 +77,7 @@ router.register(r'performance', PerformanceDataViewSet, basename='performance')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'files', FileViewSet, basename='file')
-router.register(r'notifications', NotificationViewSet, basename='notification')  # Fixed: only register once
+router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'social-accounts', SocialMediaAccountViewSet, basename='social-account')
 
 urlpatterns = [
@@ -95,6 +113,12 @@ urlpatterns = [
     # Health check
     path('health/', health_check, name='health_check'),
     
-    # Include router URLs - this automatically includes notifications/
+    # Message endpoints - Add custom endpoints before the router registration
+    path('messages/send-to-admin/', send_message_to_admin, name='send_message_to_admin'),
+    path('messages/send-to-client/', send_message_to_client, name='send_message_to_client'),
+    path('messages/admin-conversations/', get_admin_conversations, name='admin_conversations'),
+    path('messages/conversation/<uuid:user_id>/', get_conversation_messages, name='conversation_messages'),
+    
+    # Include router URLs - this automatically includes all ViewSet endpoints
     path('', include(router.urls)),
 ]

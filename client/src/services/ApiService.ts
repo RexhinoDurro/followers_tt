@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts - Fixed and Enhanced
+// client/src/services/ApiService.ts - Complete Fixed Version
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -223,12 +223,30 @@ class ApiService {
     return await this.request(endpoint);
   }
 
-  // Message methods
+  // Message methods - FIXED FOR ADMIN/CLIENT MESSAGING
   async getMessages() {
     return await this.request('/messages/');
   }
 
   async sendMessage(receiverId: string, content: string) {
+    // Handle special case for sending to admin
+    if (receiverId === 'admin') {
+      return await this.request('/messages/send-to-admin/', {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      });
+    }
+    
+    // For admin sending to client
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.role === 'admin') {
+      return await this.request('/messages/send-to-client/', {
+        method: 'POST',
+        body: JSON.stringify({ client_id: receiverId, content }),
+      });
+    }
+    
+    // Default behavior for direct user-to-user messages
     return await this.request('/messages/', {
       method: 'POST',
       body: JSON.stringify({ receiver: receiverId, content }),
@@ -242,7 +260,15 @@ class ApiService {
   }
 
   async getConversations() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.role === 'admin') {
+      return await this.request('/messages/admin-conversations/');
+    }
     return await this.request('/messages/conversations/');
+  }
+  
+  async getConversationMessages(userId: string) {
+    return await this.request(`/messages/conversation/${userId}/`);
   }
 
   // Invoice methods

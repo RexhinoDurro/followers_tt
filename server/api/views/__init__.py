@@ -12,6 +12,18 @@ from .views import (
     health_check
 )
 
+# Import message views if available
+try:
+    from .message_views import (
+        send_message_to_admin, send_message_to_client,
+        get_admin_conversations, get_conversation_messages
+    )
+    MESSAGE_VIEWS_AVAILABLE = True
+except ImportError:
+    # Message views not available
+    MESSAGE_VIEWS_AVAILABLE = False
+    pass
+
 # Import OAuth views if available (they're imported in urls.py)
 try:
     from .oauth_views import (
@@ -34,3 +46,9 @@ __all__ = [
     'analytics_overview', 'client_performance_report',
     'health_check'
 ]
+
+if MESSAGE_VIEWS_AVAILABLE:
+    __all__.extend([
+        'send_message_to_admin', 'send_message_to_client',
+        'get_admin_conversations', 'get_conversation_messages'
+    ])
