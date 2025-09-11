@@ -49,38 +49,16 @@ export const Header: React.FC = () => {
               Home
             </Link>
             
-            <div className="relative group">
-              <button 
-                className="text-white hover:text-gray-200 px-3 py-2 text-sm font-medium transition-colors flex items-center"
-              >
-                Services
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="py-1">
-                  <Link 
-                    to="/services/instagram" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
-                  >
-                    Instagram Growth
-                  </Link>
-                  <Link 
-                    to="/services/tiktok" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
-                  >
-                    TikTok Growth
-                  </Link>
-                  <Link 
-                    to="/services/youtube" 
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
-                  >
-                    YouTube Growth
-                  </Link>
-                </div>
-              </div>
-            </div>
+            <Link 
+              to="/services/instagram" 
+              className={`px-3 py-2 text-sm font-medium transition-colors text-white hover:text-gray-200 ${
+                isActive('/services/instagram') 
+                  ? 'border-b-2 border-white' 
+                  : ''
+              }`}
+            >
+              Services
+            </Link>
             
             <Link 
               to="/pricing" 
