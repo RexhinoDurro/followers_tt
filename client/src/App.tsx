@@ -16,8 +16,8 @@ import HowItWorksPage from './pages/HowItWorksPage';
 import PricingPage from './pages/PricingPage';
 import CartPage from './pages/CartPage';
 import InstagramGrowth from './pages/services/InstagramGrowth';
-import TikTokGrowth from './pages/services/TikTokGrowth';
-import YouTubeGrowth from './pages/services/YouTubeGrowth';
+
+
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -165,25 +165,9 @@ const AppContent: React.FC = () => {
           </div>
         } />
         
-        <Route path="/services/tiktok" element={
-          <div className="min-h-screen bg-gray-50">
-            <Header />
-            <main>
-              <TikTokGrowth />
-            </main>
-            <Footer />
-          </div>
-        } />
+       
         
-        <Route path="/services/youtube" element={
-          <div className="min-h-screen bg-gray-50">
-            <Header />
-            <main>
-              <YouTubeGrowth />
-            </main>
-            <Footer />
-          </div>
-        } />
+       
         
         {/* Cart & Checkout Routes */}
         <Route path="/cart" element={

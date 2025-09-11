@@ -70,13 +70,13 @@ export const Header: React.FC = () => {
                     to="/services/tiktok" 
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
                   >
-                    TikTok Growth
+             
                   </Link>
                   <Link 
                     to="/services/youtube" 
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
                   >
-                    YouTube Growth
+                 
                   </Link>
                 </div>
               </div>
@@ -204,20 +204,6 @@ export const Header: React.FC = () => {
                     onClick={handleMobileMenuClose}
                   >
                     Instagram Growth
-                  </Link>
-                  <Link 
-                    to="/services/tiktok" 
-                    className="block px-3 py-2 text-sm font-medium text-white hover:bg-white hover:text-purple-800 transition-all duration-200 rounded-md"
-                    onClick={handleMobileMenuClose}
-                  >
-                    TikTok Growth
-                  </Link>
-                  <Link 
-                    to="/services/youtube" 
-                    className="block px-3 py-2 text-sm font-medium text-white hover:bg-white hover:text-purple-800 transition-all duration-200 rounded-md"
-                    onClick={handleMobileMenuClose}
-                  >
-                    YouTube Growth
                   </Link>
                 </div>
               </div>
