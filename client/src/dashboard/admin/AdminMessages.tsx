@@ -27,13 +27,20 @@ interface Conversation {
   avatar?: string;
 }
 
+interface ClientUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  avatar?: string;
+}
+
 interface Client {
   id: string;
   name: string;
   email: string;
   company: string;
   status: string;
-  avatar?: string;
+  user?: ClientUser;
 }
 
 const AdminMessages: React.FC = () => {
@@ -68,24 +75,28 @@ const AdminMessages: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [, clientsDataRaw] = await Promise.all([
+      const [conversationsData, clientsDataRaw] = await Promise.all([
         ApiService.getConversations(),
         ApiService.getClients()
       ]);
-      const clientsData: Client[] = Array.isArray(clientsDataRaw) ? clientsDataRaw : [];
+      
+      const clientsData = Array.isArray(clientsDataRaw) ? clientsDataRaw : [];
+      
       // Transform clients into conversations format
       const clientConversations: Conversation[] = clientsData.map((client: Client) => ({
         id: client.id,
-        name: client.name,
+        name: client.user ? `${client.user.first_name} ${client.user.last_name}` : client.name,
         role: 'client' as const,
         company: client.company,
         unreadCount: 0,
-        avatar: client.avatar
-      }));
+        avatar: client.user?.avatar
+      })).filter((conv: Conversation) => conv.name.trim() !== '');  // Filter out any clients without names
+      
       setConversations(clientConversations);
       setClients(clientsData);
+      
       // Auto-select first conversation if available
-      if (clientConversations.length > 0) {
+      if (clientConversations.length > 0 && !selectedConversation) {
         setSelectedConversation(clientConversations[0]);
       }
     } catch (error) {
@@ -148,11 +159,18 @@ const AdminMessages: React.FC = () => {
     if (client) {
       const newConv: Conversation = {
         id: client.id,
-        name: client.name,
+        name: client.user ? `${client.user.first_name} ${client.user.last_name}` : client.name,
         role: 'client',
         company: client.company,
-        unreadCount: 0
+        unreadCount: 0,
+        avatar: client.user?.avatar
       };
+      
+      // Check if conversation already exists
+      const existingConv = conversations.find(conv => conv.id === client.id);
+      if (!existingConv) {
+        setConversations(prev => [...prev, newConv]);
+      }
       
       setSelectedConversation(newConv);
       setShowNewConversation(false);
@@ -480,9 +498,9 @@ const AdminMessages: React.FC = () => {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
             >
               <option value="">Choose a client...</option>
-              {clients.map((client) => (
+              {clients.map((client: Client) => (
                 <option key={client.id} value={client.id}>
-                  {client.name} - {client.company}
+                  {client.user ? `${client.user.first_name} ${client.user.last_name}` : client.name} - {client.company}
                 </option>
               ))}
             </select>

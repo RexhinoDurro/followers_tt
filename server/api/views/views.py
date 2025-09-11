@@ -668,15 +668,29 @@ def analytics_overview(request):
         })
         current_date += timedelta(days=7)  # Weekly data points
     
-    # Revenue trends
-    revenue_data = Invoice.objects.filter(
-        status='paid',
-        paid_at__date__gte=start_date
-    ).extra(
-        select={'month': 'DATE_TRUNC(\'month\', paid_at)'}
-    ).values('month').annotate(
-        total=Sum('amount')
-    ).order_by('month')
+    # Revenue trends (SQLite/Postgres compatible)
+    from django.db import connection
+    if connection.vendor == 'sqlite':
+        revenue_data = Invoice.objects.filter(
+            status='paid',
+            paid_at__date__gte=start_date
+        ).extra(
+            select={'month': 
+                	"strftime('%Y-%m-01', paid_at)"
+            }
+        ).values('month').annotate(
+            total=Sum('amount')
+        ).order_by('month')
+    else:
+        from django.db.models.functions import TruncMonth
+        revenue_data = Invoice.objects.filter(
+            status='paid',
+            paid_at__date__gte=start_date
+        ).annotate(
+            month=TruncMonth('paid_at')
+        ).values('month').annotate(
+            total=Sum('amount')
+        ).order_by('month')
     
     # Task completion rates
     task_stats = Task.objects.aggregate(

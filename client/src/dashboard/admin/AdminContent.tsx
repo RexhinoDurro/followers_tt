@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Calendar, Clock, Eye, Heart, MessageCircle,
-  Share2, TrendingUp, Image, Video, Music, Edit, Trash2,
-  CheckCircle, XCircle, AlertCircle, Filter, Search, Users,
-  MoreVertical, Play, Pause, BarChart3
+  Share2, TrendingUp, Edit,
+  CheckCircle, XCircle, Search,
+  BarChart3
 } from 'lucide-react';
-import { Card, Button, Modal, Input, Badge } from '../../components/ui';
+import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
 
 interface ContentPost {
