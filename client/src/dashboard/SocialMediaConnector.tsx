@@ -87,7 +87,7 @@ const SocialMediaConnector: React.FC = () => {
       };
     },
 
-    async handleOAuthCallback(platform: string, code: string, state: string): Promise<ConnectionResponse> {
+    async handleOAuthCallback(platform: string, _code: string, _state: string): Promise<ConnectionResponse> {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Simulate successful connection
@@ -108,12 +108,12 @@ const SocialMediaConnector: React.FC = () => {
       };
     },
 
-    async disconnectAccount(accountId: string): Promise<{ message: string }> {
+    async disconnectAccount(_accountId: string): Promise<{ message: string }> {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return { message: 'Account disconnected successfully' };
     },
 
-    async triggerSync(accountId: string): Promise<{ message: string }> {
+    async triggerSync(_accountId: string): Promise<{ message: string }> {
       await new Promise(resolve => setTimeout(resolve, 1500));
       return { message: 'Sync completed successfully' };
     }

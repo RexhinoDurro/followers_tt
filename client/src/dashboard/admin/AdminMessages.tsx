@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare, Send, Search, MoreVertical, Paperclip, Phone, Video, ChevronLeft,
-  RefreshCw, User, Clock, CheckCircle
+  RefreshCw, CheckCircle
 } from 'lucide-react';
 import { Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';

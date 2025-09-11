@@ -1,10 +1,10 @@
 // client/src/dashboard/admin/AdminInvoices.tsx
 import React, { useState, useEffect } from 'react';
 import {
-  DollarSign, FileText, Download, Send, Plus, Search,
-  Filter, Calendar, CheckCircle, XCircle, AlertCircle,
-  Clock, TrendingUp, CreditCard, Printer, Mail,
-  ChevronDown, ChevronUp, Edit, Trash2, Eye
+  DollarSign, FileText, Download, Plus, Search,
+  CheckCircle,  AlertCircle,
+  Clock, TrendingUp, Printer, Mail,
+  ChevronDown, ChevronUp, Eye
 } from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -52,8 +52,8 @@ const AdminInvoices: React.FC = () => {
   const [filterClient, setFilterClient] = useState('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
-  const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [, setShowInvoiceDetails] = useState(false);
+  const [, setSelectedInvoice] = useState<Invoice | null>(null);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');

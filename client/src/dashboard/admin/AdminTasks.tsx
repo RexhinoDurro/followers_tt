@@ -1,10 +1,10 @@
 // client/src/dashboard/admin/AdminTasks.tsx
 import React, { useState, useEffect } from 'react';
 import { 
-  CheckCircle, Plus, Search, Filter, MoreVertical, Edit, Trash2,
-  Clock, AlertCircle, Calendar, User, Flag, ChevronRight,
-  PlayCircle, PauseCircle, XCircle, CheckSquare, Square,
-  TrendingUp, Users, Timer, Target, ArrowUp, ArrowDown,
+  CheckCircle, Plus, Search,  MoreVertical, Edit, Trash2,
+  Clock, AlertCircle, Calendar, User,
+  PlayCircle,  CheckSquare, 
+  Target, ArrowUp, ArrowDown,
   Zap, AlertTriangle, Info, List, Kanban
 } from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
@@ -169,30 +169,7 @@ const AdminTasks: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="w-4 h-4 text-gray-500" />;
-      case 'in-progress':
-        return <PlayCircle className="w-4 h-4 text-blue-500" />;
-      case 'review':
-        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      default:
-        return null;
-    }
-  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'default';
-      case 'in-progress': return 'primary';
-      case 'review': return 'warning';
-      case 'completed': return 'success';
-      default: return 'default';
-    }
-  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

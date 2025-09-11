@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Calendar, Clock, Eye, Heart, MessageCircle,
-  Share2, TrendingUp, Image, Video, Music, Edit, Trash2,
-  CheckCircle, XCircle, AlertCircle, Filter, Search
+  Share2, Edit, CheckCircle
 } from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -26,8 +25,6 @@ const ClientContent: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
   const [showCreateContent, setShowCreateContent] = useState(false);
-  const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
-
   const [newContent, setNewContent] = useState({
     platform: 'instagram',
     content: '',

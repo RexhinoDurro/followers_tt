@@ -1,9 +1,9 @@
 // client/src/dashboard/client/ClientMessages.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  MessageSquare, Send, Search, Users, Clock,
-  CheckCircle, Paperclip, Image, FileText, 
-  Phone, Video, MoreVertical, Smile, User,
+  MessageSquare, Send, Search, Users, 
+  CheckCircle, Paperclip, FileText, 
+  Phone, Video, MoreVertical, Smile, 
   AlertCircle, RefreshCw, Calendar, Download
 } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';

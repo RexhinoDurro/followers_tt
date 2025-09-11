@@ -1,5 +1,5 @@
 // data/services.ts
-import type { ServiceCategory, Package } from '../types';
+import type { ServiceCategory } from '../types';
 
 export const serviceCategories: ServiceCategory[] = [
   {

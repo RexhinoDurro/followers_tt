@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, Users, Eye, Heart, BarChart3,
   Download, RefreshCw, Target, Award, Zap,
-  ArrowUp, ArrowDown, Activity, Globe, Share2,
+  ArrowUp, ArrowDown, Activity, Globe, 
   PieChart, DollarSign, ChevronRight
 } from 'lucide-react';
-import { Card, Button, Modal, Badge } from '../../components/ui';
+import { Card, Button, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
 
 interface PerformanceData {

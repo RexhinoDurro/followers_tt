@@ -1,7 +1,6 @@
 // client/src/dashboard/DashboardLayout.tsx - Updated with Working Notifications
 import React, { useState } from 'react';
 import { 
-  User, 
   DollarSign, 
   Users, 
   MessageSquare, 
@@ -11,7 +10,6 @@ import {
   CheckCircle, 
   TrendingUp, 
   FileText, 
-  Bell, 
   Menu, 
   X 
 } from 'lucide-react';

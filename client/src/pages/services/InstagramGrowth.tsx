@@ -16,7 +16,6 @@ import {
   Calendar,
   Camera,
   Hash,
-  Play,
   Award,
   Shield,
   Clock,

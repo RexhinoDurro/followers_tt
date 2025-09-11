@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   CreditCard, DollarSign, FileText, Download, Calendar,
-  CheckCircle, XCircle, AlertCircle, Clock, TrendingUp,
-  Shield, Info, ChevronRight, Receipt, History,
+  CheckCircle, AlertCircle, Clock, TrendingUp,
+  Shield, Info, Receipt, 
   Zap, Award, Settings, Plus,
   Users
 } from 'lucide-react';
@@ -49,11 +49,11 @@ interface BillingStats {
 }
 
 const ClientBilling: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
+  const [, setShowAddPaymentMethod] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'payment' | 'subscription'>('overview');
 

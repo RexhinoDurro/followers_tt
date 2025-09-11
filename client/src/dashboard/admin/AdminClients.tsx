@@ -1,9 +1,9 @@
 // client/src/dashboard/admin/AdminClients.tsx - Fixed Version
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, Plus, Search, Filter, MoreVertical, Edit, Trash2, 
-  DollarSign, TrendingUp, Calendar, Mail, Phone, Globe,
-  CheckCircle, XCircle, Clock, AlertCircle, Eye, RefreshCw
+  Users, Plus, Search, Filter, MoreVertical, Edit, 
+  DollarSign, TrendingUp, Mail, 
+  CheckCircle, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -31,8 +31,8 @@ const AdminClients: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showAddClient, setShowAddClient] = useState(false);
-  const [showEditClient, setShowEditClient] = useState(false);
   const [showClientDetails, setShowClientDetails] = useState(false);
+  const [, setShowEditClient] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [newClient, setNewClient] = useState({

@@ -5,15 +5,11 @@ import {
   Users, 
   Clock, 
   AlertCircle,
-  TrendingUp,
   FileText,
   MessageSquare,
   RefreshCw,
   Plus,
-  Calendar,
   Target,
-  Edit,
-  Trash2,
   CheckCircle,
   XCircle,
   Eye
@@ -89,8 +85,8 @@ const AdminOverview: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAction, setSelectedAction] = useState<string | null>(null);
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [] = useState<string | null>(null);
+  const [] = useState<string[]>([]);
 
   // Modal states
   const [showCreateTask, setShowCreateTask] = useState(false);

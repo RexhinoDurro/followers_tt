@@ -5,16 +5,12 @@ import {
   CheckCircle, 
   AlertCircle, 
   MessageSquare, 
-  DollarSign, 
-  TrendingUp, 
-  FileText,
+
   Check,
   X,
   Clock
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
-import { Button } from './ui/Button';
-
 export const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -32,18 +28,16 @@ export const NotificationDropdown: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: 'success' | 'error' | 'warning' | 'info') => {
     switch (type) {
-      case 'task_assigned':
-        return <CheckCircle className="w-5 h-5 text-blue-500" />;
-      case 'payment_due':
-        return <DollarSign className="w-5 h-5 text-yellow-500" />;
-      case 'content_approved':
-        return <FileText className="w-5 h-5 text-green-500" />;
-      case 'message_received':
-        return <MessageSquare className="w-5 h-5 text-purple-500" />;
-      case 'performance_update':
-        return <TrendingUp className="w-5 h-5 text-indigo-500" />;
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'warning':
+        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
+      case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
+      case 'info':
+        return <MessageSquare className="w-5 h-5 text-blue-500" />;
       default:
         return <AlertCircle className="w-5 h-5 text-gray-500" />;
     }
@@ -67,20 +61,17 @@ export const NotificationDropdown: React.FC = () => {
     }
     // Handle navigation based on notification type
     switch (notification.notification_type) {
-      case 'task_assigned':
+      case 'success':
         window.location.hash = 'tasks';
         break;
-      case 'payment_due':
-        window.location.hash = 'billing';
-        break;
-      case 'content_approved':
-        window.location.hash = 'content';
-        break;
-      case 'message_received':
+      case 'info':
         window.location.hash = 'messages';
         break;
-      case 'performance_update':
-        window.location.hash = 'performance';
+      case 'warning':
+        window.location.hash = 'billing';
+        break;
+      case 'error':
+        window.location.hash = 'alerts';
         break;
     }
     setIsOpen(false);
@@ -163,7 +154,7 @@ export const NotificationDropdown: React.FC = () => {
                   >
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0 mt-1">
-                        {getIcon(notification.notification_type)}
+                        {getIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
@@ -183,7 +174,7 @@ export const NotificationDropdown: React.FC = () => {
                         </div>
                         <div className="flex items-center mt-2 text-xs text-gray-500">
                           <Clock className="w-3 h-3 mr-1" />
-                          {formatTime(notification.created_at)}
+                          {formatTime(notification.timestamp)}
                         </div>
                       </div>
                     </div>

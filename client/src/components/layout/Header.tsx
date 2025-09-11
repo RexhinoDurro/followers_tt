@@ -6,7 +6,7 @@ import navlogo from '../../assets/navlogo.png';
 
 export const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [, setIsServicesOpen] = useState(false);
   const [cartCount] = useState(0);
   const location = useLocation();
 

@@ -1,6 +1,6 @@
 // pages/HomePage.tsx - Fully Responsive Version
 import React, { useState, useEffect } from 'react';
-import { Play, TrendingUp, Users, Star, ArrowRight, CheckCircle, Quote } from 'lucide-react';
+import { Play, TrendingUp, ArrowRight, CheckCircle, Quote } from 'lucide-react';
 
 interface HomePageProps {
   onGetStarted?: () => void;

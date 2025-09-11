@@ -8,6 +8,7 @@ interface NotificationContextType {
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
   clearAll: () => void;
 }
 
@@ -84,12 +85,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const markAllAsRead = () => {
+    setNotifications(prev =>
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  };
+
   const value: NotificationContextType = {
     notifications,
     unreadCount,
     addNotification,
     removeNotification,
     markAsRead,
+    markAllAsRead,
     clearAll,
   };
 
@@ -103,7 +111,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
 // Toast notifications component
 const NotificationToasts: React.FC = () => {
-  const { notifications, removeNotification, markAsRead } = useNotifications();
+  const { notifications, removeNotification } = useNotifications();
 
   const getIcon = (type: string) => {
     switch (type) {

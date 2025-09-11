@@ -62,32 +62,6 @@ class ApiService {
     return response as T;
   }
 
-  // Helper to get paginated response with metadata
-  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<{
-    results: T;
-    count?: number;
-    next?: string | null;
-    previous?: string | null;
-  }> {
-    const response = await this.request<any>(endpoint, options);
-    
-    if (response && typeof response === 'object' && 'results' in response) {
-      return {
-        results: response.results as T,
-        count: response.count,
-        next: response.next,
-        previous: response.previous
-      };
-    }
-    
-    // If not paginated, wrap in results
-    return {
-      results: response as T,
-      count: Array.isArray(response) ? response.length : 1,
-      next: null,
-      previous: null
-    };
-  }
 
   // Authentication methods
   async login(email: string, password: string) {

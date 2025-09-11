@@ -4,12 +4,11 @@ import {
   TrendingUp, Users, Eye, Heart, BarChart3,
   Download, RefreshCw, Target, Award, Zap,
   ArrowUp, ArrowDown, Activity, Globe, Share2,
-  Calendar, Clock, Instagram, Youtube, Music,
-  ChevronRight, Info, AlertCircle
+  Clock, Instagram, Youtube, Music,
+  AlertCircle
 } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
-import { useAuth } from '../../context/AuthContext';
 
 interface PerformanceData {
   id: string;
@@ -183,7 +182,8 @@ const ClientPerformance: React.FC = () => {
     );
   }
 
-  function setSelectedMetric(id: string) {
+
+  function setSelectedMetric(_id: string) {
     throw new Error('Function not implemented.');
   }
 
@@ -321,7 +321,7 @@ const ClientPerformance: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card title="Growth Summary">
                   <div className="space-y-4">
-                    {performanceData.slice(0, 6).map((data, index) => (
+                    {performanceData.slice(0, 6).map((data) => (
                       <div key={data.id} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-900">
@@ -593,8 +593,8 @@ const ClientPerformance: React.FC = () => {
 
                 <Card title="Real-time Updates">
                   <div className="space-y-3">
-                    {realTimeMetrics.slice(0, 5).map((metric, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {realTimeMetrics.slice(0, 5).map((metric) => (
+                      <div key={`${metric.account.id}-${metric.account.platform}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center space-x-3">
                           {getPlatformIcon(metric.account.platform)}
                           <div>

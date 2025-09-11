@@ -10,16 +10,13 @@ import {
   CreditCard,
   Eye,
   Heart,
-  Share2,
   AlertCircle,
   RefreshCw,
   Plus,
   Link,
   Settings,
-  Download,
-  Bell
-} from 'lucide-react';
-import { Card, Badge, Button, Modal, Input } from '../../components/ui';
+  Download} from 'lucide-react';
+import { Card, Badge, Button, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/ApiService';
 
@@ -92,7 +89,7 @@ const ClientOverview: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   // Modal states
   const [showConnectAccount, setShowConnectAccount] = useState(false);

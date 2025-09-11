@@ -316,7 +316,7 @@ const PricingPage: React.FC = () => {
       <section className="pb-12 sm:pb-16 md:pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            {currentPlans.map((plan, index) => (
+            {currentPlans.map((plan) => (
               <div
                 key={plan.name}
                 className={`relative bg-white rounded-xl sm:rounded-2xl shadow-xl ${plan.color} ${
