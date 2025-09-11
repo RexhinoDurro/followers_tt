@@ -196,6 +196,7 @@ FACEBOOK_APP_SECRET = config('FACEBOOK_APP_SECRET', default='')
 # Google/YouTube API
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
+YOUTUBE_REDIRECT_URI = config('YOUTUBE_REDIRECT_URI', default=f"{FRONTEND_URL}/auth/youtube/callback")
 
 # TikTok API (when available)
 TIKTOK_CLIENT_KEY = config('TIKTOK_CLIENT_KEY', default='')

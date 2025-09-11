@@ -162,7 +162,7 @@ def initiate_youtube_oauth(request):
         # Build Google OAuth URL
         params = {
             'client_id': settings.GOOGLE_CLIENT_ID,
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
+            'redirect_uri': settings.YOUTUBE_REDIRECT_URI,
             'scope': 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly',
             'response_type': 'code',
             'access_type': 'offline',
@@ -171,6 +171,11 @@ def initiate_youtube_oauth(request):
         }
         
         oauth_url = f"https://accounts.google.com/oauth2/auth?{urlencode(params)}"
+        
+        # Debug log
+        logger.info(f"YouTube OAuth URL generated: {oauth_url}")
+        logger.info(f"Params: {params}")
+        logger.info(f"Settings YOUTUBE_REDIRECT_URI: {settings.YOUTUBE_REDIRECT_URI}")
         
         return Response({
             'oauth_url': oauth_url,
@@ -207,7 +212,7 @@ def handle_youtube_callback(request):
             'client_secret': settings.GOOGLE_CLIENT_SECRET,
             'code': code,
             'grant_type': 'authorization_code',
-            'redirect_uri': f"{settings.FRONTEND_URL}/auth/youtube/callback",
+            'redirect_uri': settings.YOUTUBE_REDIRECT_URI,
         }
         
         token_response = requests.post(token_url, data=token_data)

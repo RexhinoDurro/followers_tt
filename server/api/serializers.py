@@ -126,16 +126,25 @@ class RealTimeMetricsSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 class ClientSerializer(serializers.ModelSerializer):
-    """Client serializer"""
+    """Enhanced Client serializer with user info"""
+    user_id = serializers.CharField(source='user.id', read_only=True)
+    user_first_name = serializers.CharField(source='user.first_name', read_only=True)
+    user_last_name = serializers.CharField(source='user.last_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_avatar = serializers.ImageField(source='user.avatar', read_only=True)
+    
     class Meta:
         model = Client
         fields = [
             'id', 'name', 'email', 'company', 'package', 'monthly_fee',
             'start_date', 'status', 'payment_status', 'platforms',
             'account_manager', 'next_payment', 'total_spent', 'notes',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at',
+            # Add user fields
+            'user_id', 'user_first_name', 'user_last_name', 'user_email', 'user_avatar'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user_id', 'user_first_name', 'user_last_name', 'user_email', 'user_avatar']
+
 
 class TaskSerializer(serializers.ModelSerializer):
     """Task serializer"""

@@ -47,64 +47,91 @@ const RealTimeDashboard: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Mock API service - replace with your actual API calls
+  const handleConnectAccount = async (platform: string) => {
+    try {
+      const response = await fetch(`/api/oauth/${platform}/init`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      
+      if (data.auth_url) {
+        // Open OAuth window
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        
+        const oauthWindow = window.open(
+          data.auth_url,
+          'Connect Account',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+        
+        // Handle OAuth callback
+        window.addEventListener('message', async (event) => {
+          if (event.origin === window.location.origin && event.data?.type === 'oauth_callback') {
+            if (oauthWindow) oauthWindow.close();
+            
+            const { code, state } = event.data;
+            
+            // Complete OAuth flow
+            const callbackResponse = await fetch(`/api/oauth/${platform}/callback`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({ code, state })
+            });
+            
+            if (callbackResponse.ok) {
+              await fetchData(); // Refresh data after successful connection
+            }
+          }
+        });
+      }
+    } catch (error) {
+      setError('Failed to initiate account connection');
+      console.error('Connection error:', error);
+    }
+  };
+
+  // API service with real endpoints
   const ApiService = {
     async getConnectedAccounts(): Promise<ApiResponse<Account>> {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/social-accounts', {
+        credentials: 'include'
+      });
       
-      return {
-        accounts: [
-          {
-            id: '1',
-            platform: 'instagram',
-            username: 'your_brand',
-            is_active: true,
-            followers_count: 15420,
-            engagement_rate: 4.2,
-            posts_count: 156,
-            last_sync: new Date().toISOString()
-          },
-          {
-            id: '2',
-            platform: 'youtube',
-            username: 'Your Channel',
-            is_active: true,
-            followers_count: 8340,
-            engagement_rate: 6.8,
-            posts_count: 42,
-            last_sync: new Date(Date.now() - 300000).toISOString() // 5 minutes ago
-          }
-        ]
-      };
+      if (!response.ok) throw new Error('Failed to fetch accounts');
+      
+      return await response.json();
     },
 
     async getRealTimeMetrics(): Promise<ApiResponse<Metric>> {
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const response = await fetch('/api/realtime-metrics', {
+        credentials: 'include'
+      });
       
-      return {
-        data: [
-          {
-            account: { id: '1', platform: 'instagram', username: 'your_brand' },
-            followers_count: 15420 + Math.floor(Math.random() * 10),
-            engagement_rate: 4.2 + (Math.random() * 0.5 - 0.25),
-            reach: 28500 + Math.floor(Math.random() * 1000),
-            daily_growth: Math.floor(Math.random() * 20) + 5
-          },
-          {
-            account: { id: '2', platform: 'youtube', username: 'Your Channel' },
-            followers_count: 8340 + Math.floor(Math.random() * 5),
-            engagement_rate: 6.8 + (Math.random() * 0.3 - 0.15),
-            reach: 45200 + Math.floor(Math.random() * 2000),
-            daily_growth: Math.floor(Math.random() * 15) + 2
-          }
-        ]
-      };
+      if (!response.ok) throw new Error('Failed to fetch metrics');
+      
+      return await response.json();
     },
 
     async triggerManualSync(accountId: string): Promise<{ message: string }> {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return { message: 'Sync completed successfully' };
+      const response = await fetch(`/api/social-accounts/${accountId}/sync`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) throw new Error('Failed to trigger sync');
+      
+      return await response.json();
     }
   };
 
@@ -243,9 +270,26 @@ const RealTimeDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Accounts Connected</h3>
               <p className="text-gray-600 mb-4">Connect your social media accounts to start tracking real-time metrics</p>
-              <button className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-                Connect Account
-              </button>
+              <div className="space-y-4">
+                <button
+                  onClick={() => handleConnectAccount('instagram')}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <div className="w-5 h-5 bg-white rounded-lg flex items-center justify-center">
+                    <span className="text-pink-600 font-bold text-xs">IG</span>
+                  </div>
+                  <span>Connect Instagram</span>
+                </button>
+                <button
+                  onClick={() => handleConnectAccount('youtube')}
+                  className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-2 rounded-lg hover:from-red-700 hover:to-red-600 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <div className="w-5 h-5 bg-white rounded-lg flex items-center justify-center">
+                    <span className="text-red-600 font-bold text-xs">YT</span>
+                  </div>
+                  <span>Connect YouTube</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

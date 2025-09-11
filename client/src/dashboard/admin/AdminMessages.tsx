@@ -1,10 +1,12 @@
-// client/src/dashboard/admin/AdminMessages.tsx - Complete Implementation
+// client/src/dashboard/admin/AdminMessages.tsx - Fixed Implementation
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  MessageSquare, Send, Search, MoreVertical, Paperclip, Phone, Video, ChevronLeft
+  MessageSquare, Send, Search, MoreVertical, Paperclip, Phone, Video, ChevronLeft,
+  RefreshCw, User, Clock, CheckCircle
 } from 'lucide-react';
 import { Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
+import { useAuth } from '../../context/AuthContext';
 
 interface Message {
   id: string;
@@ -19,12 +21,15 @@ interface Message {
 
 interface Conversation {
   id: string;
+  clientId: string;
+  userId: string;
   name: string;
   role: 'client' | 'admin';
   company?: string;
   lastMessage?: Message;
   unreadCount: number;
   avatar?: string;
+  email?: string;
 }
 
 interface ClientUser {
@@ -41,9 +46,16 @@ interface Client {
   company: string;
   status: string;
   user?: ClientUser;
+  // New fields from updated serializer
+  user_id?: string;
+  user_first_name?: string;
+  user_last_name?: string;
+  user_email?: string;
+  user_avatar?: string;
 }
 
 const AdminMessages: React.FC = () => {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -55,11 +67,26 @@ const AdminMessages: React.FC = () => {
   const [filterRead, setFilterRead] = useState('all');
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [selectedClient, setSelectedClient] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetchData();
+    
+    // Set up polling for new messages every 5 seconds
+    messagePollingRef.current = setInterval(() => {
+      if (selectedConversation) {
+        fetchConversationMessages(selectedConversation.userId, false);
+      }
+    }, 5000);
+    
+    return () => {
+      if (messagePollingRef.current) {
+        clearInterval(messagePollingRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -68,57 +95,97 @@ const AdminMessages: React.FC = () => {
 
   useEffect(() => {
     if (selectedConversation) {
-      fetchConversationMessages(selectedConversation.id);
+      fetchConversationMessages(selectedConversation.userId);
     }
   }, [selectedConversation]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [conversationsData, clientsDataRaw] = await Promise.all([
-        ApiService.getConversations(),
-        ApiService.getClients()
-      ]);
+      console.log('Fetching clients data...');
       
-      const clientsData = Array.isArray(clientsDataRaw) ? clientsDataRaw : [];
-      
-      // Transform clients into conversations format
-      const clientConversations: Conversation[] = clientsData.map((client: Client) => ({
-        id: client.id,
-        name: client.user ? `${client.user.first_name} ${client.user.last_name}` : client.name,
-        role: 'client' as const,
-        company: client.company,
-        unreadCount: 0,
-        avatar: client.user?.avatar
-      })).filter((conv: Conversation) => conv.name.trim() !== '');  // Filter out any clients without names
-      
-      setConversations(clientConversations);
-      setClients(clientsData);
-      
-      // Auto-select first conversation if available
-      if (clientConversations.length > 0 && !selectedConversation) {
-        setSelectedConversation(clientConversations[0]);
+      // First try to get conversations from the admin endpoint
+      try {
+        const conversationsData = await ApiService.getConversations();
+        console.log('Conversations from API:', conversationsData);
+        
+        if (Array.isArray(conversationsData) && conversationsData.length > 0) {
+          setConversations(conversationsData);
+          
+          // Auto-select first conversation if available
+          if (!selectedConversation && conversationsData.length > 0) {
+            setSelectedConversation(conversationsData[0]);
+          }
+        }
+      } catch (convError) {
+        console.log('Using fallback method to build conversations from clients');
+        
+        // Fallback: Build conversations from clients list
+        const clientsDataRaw = await ApiService.getClients();
+        console.log('Clients data:', clientsDataRaw);
+        
+        const clientsData = Array.isArray(clientsDataRaw) ? clientsDataRaw : [];
+        
+        // Transform clients into conversations format
+        const clientConversations: Conversation[] = clientsData
+          .filter((client: Client) => client.user_id) // Only include clients with user_id
+          .map((client: Client) => ({
+            id: client.id,
+            clientId: client.id,
+            userId: client.user_id || '', // Use the user_id from serializer
+            name: client.user_first_name && client.user_last_name 
+              ? `${client.user_first_name} ${client.user_last_name}`
+              : client.name,
+            role: 'client' as const,
+            company: client.company,
+            email: client.user_email || client.email,
+            unreadCount: 0,
+            avatar: client.user_avatar
+          }));
+        
+        console.log('Transformed conversations:', clientConversations);
+        
+        setConversations(clientConversations);
+        setClients(clientsData);
+        
+        // Auto-select first conversation if available
+        if (clientConversations.length > 0 && !selectedConversation) {
+          setSelectedConversation(clientConversations[0]);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  const fetchConversationMessages = async (userId: string) => {
+  const fetchConversationMessages = async (userId: string, showLoading = true) => {
+    if (!userId) {
+      console.error('No userId provided for fetching messages');
+      return;
+    }
+    
     try {
-      const messagesDataRaw = await ApiService.getMessages();
-      const messagesData: Message[] = Array.isArray(messagesDataRaw) ? messagesDataRaw : [];
-      // Filter messages for this conversation
-      const conversationMessages = messagesData.filter((msg: Message) => 
-        msg.sender === userId || msg.receiver === userId
-      );
-      setMessages(conversationMessages);
-      // Mark messages as read
-      const unreadMessages = conversationMessages.filter((msg: Message) => 
+      if (showLoading) setLoading(true);
+      
+      console.log('Fetching messages for user:', userId);
+      
+      // Use the conversation endpoint to get messages for specific user
+      const messagesData = await ApiService.getConversationMessages(userId);
+      console.log('Received messages:', messagesData);
+      
+      const messagesArray: Message[] = Array.isArray(messagesData) ? messagesData : [];
+      // Sort messages by timestamp in ascending order (oldest to newest)
+      messagesArray.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      setMessages(messagesArray);
+      
+      // Mark unread messages as read
+      const unreadMessages = messagesArray.filter((msg: Message) => 
         !msg.read && msg.sender === userId
       );
+      
       for (const msg of unreadMessages) {
         try {
           await ApiService.markMessageRead(msg.id);
@@ -129,6 +196,9 @@ const AdminMessages: React.FC = () => {
       
     } catch (error) {
       console.error('Failed to fetch messages:', error);
+      setMessages([]);
+    } finally {
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -140,13 +210,20 @@ const AdminMessages: React.FC = () => {
     try {
       setSending(true);
       
-      await ApiService.sendMessage(selectedConversation.id, newMessage.trim());
+      console.log('Sending message to client:', selectedConversation.clientId);
+      console.log('Message content:', newMessage.trim());
+      
+      // Send message using client ID (the API will handle the user lookup)
+      await ApiService.sendMessage(selectedConversation.clientId, newMessage.trim());
       
       setNewMessage('');
-      await fetchConversationMessages(selectedConversation.id);
+      
+      // Refresh messages
+      await fetchConversationMessages(selectedConversation.userId);
       
     } catch (error) {
       console.error('Failed to send message:', error);
+      alert('Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
@@ -156,25 +233,38 @@ const AdminMessages: React.FC = () => {
     if (!selectedClient) return;
     
     const client = clients.find(c => c.id === selectedClient);
-    if (client) {
+    if (client && client.user_id) {
       const newConv: Conversation = {
         id: client.id,
-        name: client.user ? `${client.user.first_name} ${client.user.last_name}` : client.name,
+        clientId: client.id,
+        userId: client.user_id,
+        name: client.user_first_name && client.user_last_name 
+          ? `${client.user_first_name} ${client.user_last_name}`
+          : client.name,
         role: 'client',
         company: client.company,
+        email: client.user_email || client.email,
         unreadCount: 0,
-        avatar: client.user?.avatar
+        avatar: client.user_avatar
       };
       
       // Check if conversation already exists
-      const existingConv = conversations.find(conv => conv.id === client.id);
+      const existingConv = conversations.find(conv => conv.clientId === client.id);
       if (!existingConv) {
         setConversations(prev => [...prev, newConv]);
       }
       
-      setSelectedConversation(newConv);
+      setSelectedConversation(existingConv || newConv);
       setShowNewConversation(false);
       setSelectedClient('');
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchData();
+    if (selectedConversation) {
+      await fetchConversationMessages(selectedConversation.userId);
     }
   };
 
@@ -215,7 +305,7 @@ const AdminMessages: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  if (loading) {
+  if (loading && conversations.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -232,10 +322,20 @@ const AdminMessages: React.FC = () => {
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
-              <Button size="sm" onClick={() => setShowNewConversation(true)}>
-                <MessageSquare className="w-4 h-4 mr-1" />
-                New
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button size="sm" onClick={() => setShowNewConversation(true)}>
+                  <MessageSquare className="w-4 h-4 mr-1" />
+                  New
+                </Button>
+              </div>
             </div>
             
             {/* Search */}
@@ -383,23 +483,37 @@ const AdminMessages: React.FC = () => {
               </div>
               
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                 {messages.map((message) => {
-                  const isOwnMessage = message.sender !== selectedConversation.id;
+                  const isOwnMessage = message.sender === user?.id;
                   
                   return (
                     <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        isOwnMessage
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}>
-                        <p className="text-sm">{message.content}</p>
-                        <p className={`text-xs mt-1 ${
-                          isOwnMessage ? 'text-purple-200' : 'text-gray-500'
-                        }`}>
-                          {formatTime(message.timestamp)}
-                        </p>
+                      <div className={`max-w-xs lg:max-w-md ${isOwnMessage ? 'order-2' : 'order-1'}`}>
+                        <div className={`flex items-end space-x-2 ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                          {!isOwnMessage && (
+                            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                              {getInitials(message.sender_name)}
+                            </div>
+                          )}
+                          <div>
+                            <div className={`px-4 py-2 rounded-lg ${
+                              isOwnMessage
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-white text-gray-900 shadow-sm'
+                            }`}>
+                              <p className="text-sm">{message.content}</p>
+                            </div>
+                            <p className={`text-xs mt-1 ${
+                              isOwnMessage ? 'text-right text-gray-600' : 'text-gray-500'
+                            }`}>
+                              {formatTime(message.timestamp)}
+                              {isOwnMessage && message.read && (
+                                <CheckCircle className="w-3 h-3 inline ml-1 text-green-500" />
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -421,7 +535,7 @@ const AdminMessages: React.FC = () => {
               </div>
               
               {/* Message Input */}
-              <div className="p-4 border-t border-gray-200">
+              <div className="p-4 border-t border-gray-200 bg-white">
                 <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
                   <div className="flex-1">
                     <textarea
@@ -457,11 +571,14 @@ const AdminMessages: React.FC = () => {
                     </Button>
                   </div>
                 </form>
+                <p className="text-xs text-gray-500 mt-2">
+                  Press Enter to send, Shift+Enter for new line
+                </p>
               </div>
             </>
           ) : (
             /* No Conversation Selected */
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center bg-gray-50">
               <div className="text-center">
                 <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -498,11 +615,15 @@ const AdminMessages: React.FC = () => {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
             >
               <option value="">Choose a client...</option>
-              {clients.map((client: Client) => (
-                <option key={client.id} value={client.id}>
-                  {client.user ? `${client.user.first_name} ${client.user.last_name}` : client.name} - {client.company}
-                </option>
-              ))}
+              {clients
+                .filter(client => client.user_id) // Only show clients with user accounts
+                .map((client: Client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.user_first_name && client.user_last_name 
+                      ? `${client.user_first_name} ${client.user_last_name}`
+                      : client.name} - {client.company}
+                  </option>
+                ))}
             </select>
           </div>
           

@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts - Complete Fixed Version
+// client/src/services/ApiService.ts - Complete Fixed Version with Pagination Handling
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -49,6 +49,44 @@ class ApiService {
       console.error('API request failed:', error);
       throw error;
     }
+  }
+
+  // Helper method to handle paginated responses from Django REST Framework
+  private handlePaginatedResponse<T>(response: any): T {
+    // Check if response is paginated (has 'results' field)
+    if (response && typeof response === 'object' && 'results' in response) {
+      // Return just the results array for backward compatibility
+      return response.results as T;
+    }
+    // If not paginated, return as-is
+    return response as T;
+  }
+
+  // Helper to get paginated response with metadata
+  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<{
+    results: T;
+    count?: number;
+    next?: string | null;
+    previous?: string | null;
+  }> {
+    const response = await this.request<any>(endpoint, options);
+    
+    if (response && typeof response === 'object' && 'results' in response) {
+      return {
+        results: response.results as T,
+        count: response.count,
+        next: response.next,
+        previous: response.previous
+      };
+    }
+    
+    // If not paginated, wrap in results
+    return {
+      results: response as T,
+      count: Array.isArray(response) ? response.length : 1,
+      next: null,
+      previous: null
+    };
   }
 
   // Authentication methods
@@ -117,9 +155,10 @@ class ApiService {
     return await this.request('/dashboard/client-stats/');
   }
 
-  // Client methods
+  // Client methods - FIXED with pagination handling
   async getClients() {
-    return await this.request('/clients/');
+    const response = await this.request('/clients/');
+    return this.handlePaginatedResponse(response);
   }
 
   async getClient(id: string) {
@@ -140,9 +179,10 @@ class ApiService {
     });
   }
 
-  // Task methods
+  // Task methods - FIXED with pagination handling
   async getTasks() {
-    return await this.request('/tasks/');
+    const response = await this.request('/tasks/');
+    return this.handlePaginatedResponse(response);
   }
 
   async createTask(taskData: any) {
@@ -177,9 +217,10 @@ class ApiService {
     });
   }
 
-  // Content methods
+  // Content methods - FIXED with pagination handling
   async getContent() {
-    return await this.request('/content/');
+    const response = await this.request('/content/');
+    return this.handlePaginatedResponse(response);
   }
 
   async createContent(contentData: any) {
@@ -212,10 +253,11 @@ class ApiService {
     });
   }
 
-  // Performance data methods
+  // Performance data methods - FIXED with pagination handling
   async getPerformanceData(clientId?: string) {
     const endpoint = clientId ? `/performance/?client_id=${clientId}` : '/performance/';
-    return await this.request(endpoint);
+    const response = await this.request(endpoint);
+    return this.handlePaginatedResponse(response);
   }
 
   async getMonthlyReport(month?: string) {
@@ -223,9 +265,10 @@ class ApiService {
     return await this.request(endpoint);
   }
 
-  // Message methods - FIXED FOR ADMIN/CLIENT MESSAGING
+  // Message methods - FIXED with pagination handling
   async getMessages() {
-    return await this.request('/messages/');
+    const response = await this.request('/messages/');
+    return this.handlePaginatedResponse(response);
   }
 
   async sendMessage(receiverId: string, content: string) {
@@ -262,18 +305,26 @@ class ApiService {
   async getConversations() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role === 'admin') {
-      return await this.request('/messages/admin-conversations/');
+      const response = await this.request('/messages/admin-conversations/');
+      // Admin conversations endpoint returns a custom format
+      if (response && typeof response === 'object' && 'conversations' in response) {
+        return (response as any).conversations;
+      }
+      return response;
     }
-    return await this.request('/messages/conversations/');
+    const response = await this.request('/messages/conversations/');
+    return this.handlePaginatedResponse(response);
   }
   
   async getConversationMessages(userId: string) {
-    return await this.request(`/messages/conversation/${userId}/`);
+    const response = await this.request(`/messages/conversation/${userId}/`);
+    return this.handlePaginatedResponse(response);
   }
 
-  // Invoice methods
+  // Invoice methods - FIXED with pagination handling
   async getInvoices() {
-    return await this.request('/invoices/');
+    const response = await this.request('/invoices/');
+    return this.handlePaginatedResponse(response);
   }
 
   async markInvoicePaid(id: string) {
@@ -289,9 +340,10 @@ class ApiService {
     });
   }
 
-  // Notification methods
+  // Notification methods - FIXED with pagination handling
   async getNotifications() {
-    return await this.request('/notifications/');
+    const response = await this.request('/notifications/');
+    return this.handlePaginatedResponse(response);
   }
 
   async markNotificationRead(id: string) {
@@ -315,9 +367,14 @@ class ApiService {
     return await this.request(`/analytics/client/${clientId}/`);
   }
 
-  // Social Media Account methods
+  // Social Media Account methods - FIXED with pagination handling
   async getConnectedAccounts() {
-    return await this.request('/social-accounts/');
+    const response = await this.request('/social-accounts/');
+    // Check if this is the OAuth view response format
+    if (response && typeof response === 'object' && 'accounts' in response) {
+      return (response as any).accounts;
+    }
+    return this.handlePaginatedResponse(response);
   }
 
   async initiateOAuth(platform: string) {
@@ -349,7 +406,12 @@ class ApiService {
 
   // Real-time metrics
   async getRealTimeMetrics() {
-    return await this.request('/metrics/realtime/');
+    const response = await this.request('/metrics/realtime/');
+    // Real-time metrics has a custom response format
+    if (response && typeof response === 'object' && 'data' in response) {
+      return (response as any).data;
+    }
+    return response;
   }
 
   // File upload methods
@@ -373,6 +435,29 @@ class ApiService {
   // Health check
   async healthCheck() {
     return await this.request('/health/');
+  }
+
+  // New method to get all pages of paginated data if needed
+  async getAllPaginatedData<T>(endpoint: string, maxPages: number = 10): Promise<T[]> {
+    let allData: T[] = [];
+    let nextUrl: string | null = endpoint;
+    let pageCount = 0;
+
+    while (nextUrl && pageCount < maxPages) {
+      const response: any = await this.request<any>(nextUrl.replace(this.baseURL, ''));
+      
+      if (response && typeof response === 'object' && 'results' in response) {
+        allData = allData.concat(response.results as T[]);
+        nextUrl = response.next;
+      } else {
+        allData = allData.concat(response as T[]);
+        nextUrl = null;
+      }
+      
+      pageCount++;
+    }
+
+    return allData;
   }
 
   // Utility methods

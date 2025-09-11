@@ -676,7 +676,7 @@ def analytics_overview(request):
             paid_at__date__gte=start_date
         ).extra(
             select={'month': 
-                	"strftime('%Y-%m-01', paid_at)"
+                "date(paid_at, 'start of month')"  # SQLite-compatible date formatting
             }
         ).values('month').annotate(
             total=Sum('amount')

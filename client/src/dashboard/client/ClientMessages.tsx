@@ -71,6 +71,8 @@ const ClientMessages: React.FC = () => {
       } else if (data && typeof data === 'object' && 'results' in data && Array.isArray((data as any).results)) {
         messagesArray = (data as { results: Message[] }).results;
       }
+      // Sort messages by timestamp in ascending order (oldest to newest)
+      messagesArray.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       setMessages(messagesArray);
       
       // Mark unread messages as read
