@@ -70,13 +70,13 @@ export const Header: React.FC = () => {
                     to="/services/tiktok" 
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
                   >
-             
+                    TikTok Growth
                   </Link>
                   <Link 
                     to="/services/youtube" 
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-800 transition-colors"
                   >
-                 
+                    YouTube Growth
                   </Link>
                 </div>
               </div>
@@ -179,35 +179,17 @@ export const Header: React.FC = () => {
               Home
             </Link>
             
-            {/* Mobile Services Menu */}
-            <div>
-              <button 
-                className="w-full text-left px-3 py-2 text-sm font-medium text-white hover:bg-white hover:text-purple-800 transition-all duration-200 rounded-md flex items-center justify-between"
-                onClick={() => setIsServicesOpen(!isServicesOpen)}
-              >
-                Services
-                <svg 
-                  className={`w-4 h-4 transition-transform duration-200 ${isServicesOpen ? 'rotate-180' : ''}`}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              <div className={`transition-all duration-200 ease-in-out ${isServicesOpen ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-                <div className="pl-4 space-y-1">
-                  <Link 
-                    to="/services/instagram" 
-                    className="block px-3 py-2 text-sm font-medium text-white hover:bg-white hover:text-purple-800 transition-all duration-200 rounded-md"
-                    onClick={handleMobileMenuClose}
-                  >
-                    Instagram Growth
-                  </Link>
-                </div>
-              </div>
-            </div>
+            <Link 
+              to="/services/instagram" 
+              className={`block px-3 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
+                isActive('/services/instagram') 
+                  ? 'bg-white text-purple-800' 
+                  : 'text-white hover:bg-white hover:text-purple-800'
+              }`}
+              onClick={handleMobileMenuClose}
+            >
+              Services
+            </Link>
             
             <Link 
               to="/pricing" 
