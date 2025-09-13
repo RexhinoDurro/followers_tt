@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts - Complete Fixed Version with Pagination Handling
+// client/src/services/ApiService.ts - Complete Fixed Version with Stripe Methods
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -61,7 +61,6 @@ class ApiService {
     // If not paginated, return as-is
     return response as T;
   }
-
 
   // Authentication methods
   async login(email: string, password: string) {
@@ -409,6 +408,78 @@ class ApiService {
   // Health check
   async healthCheck() {
     return await this.request('/health/');
+  }
+
+  // ============ STRIPE/BILLING METHODS ============
+  
+  // Get current subscription
+  async getCurrentSubscription() {
+    return await this.request('/billing/subscription/');
+  }
+
+  // Create subscription
+  async createSubscription(data: { price_id: string; plan_name: string }) {
+    return await this.request('/billing/create-subscription/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Cancel subscription
+  async cancelSubscription() {
+    return await this.request('/billing/cancel-subscription/', {
+      method: 'POST',
+    });
+  }
+
+  // Create payment intent for one-time payments
+  async createPaymentIntent(data: { amount: number; description?: string }) {
+    return await this.request('/billing/create-payment-intent/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Get payment methods
+  async getPaymentMethods() {
+    return await this.request('/billing/payment-methods/');
+  }
+
+  // Create setup intent for saving payment methods
+  async createSetupIntent() {
+    return await this.request('/billing/create-setup-intent/', {
+      method: 'POST',
+    });
+  }
+
+  // ============ ADMIN METHODS ============
+  
+  // Get admin billing settings
+  async getAdminBillingSettings() {
+    return await this.request('/admin/billing-settings/');
+  }
+
+  // Update profile
+  async updateProfile(profileData: any) {
+    return await this.request('/auth/me/', {
+      method: 'PATCH',
+      body: JSON.stringify(profileData),
+    });
+  }
+
+  // Change password
+  async changePassword(data: { current_password: string; new_password: string }) {
+    return await this.request('/auth/change-password/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Delete admin account
+  async deleteAdminAccount() {
+    return await this.request('/admin/delete-account/', {
+      method: 'POST',
+    });
   }
 
   // New method to get all pages of paginated data if needed

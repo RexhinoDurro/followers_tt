@@ -26,7 +26,9 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
   useEffect(() => {
     // Initialize Stripe
     if (window.Stripe) {
-      const stripeInstance = window.Stripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+      const stripeInstance = window.Stripe(
+        (import.meta as any).env?.VITE_STRIPE_PUBLISHABLE_KEY || (window as any).REACT_APP_STRIPE_PUBLISHABLE_KEY
+      );
       setStripe(stripeInstance);
 
       const elementsInstance = stripeInstance.elements();

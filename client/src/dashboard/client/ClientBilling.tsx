@@ -1,11 +1,11 @@
-// client/src/dashboard/client/ClientBilling.tsx
+// client/src/dashboard/client/ClientBilling.tsx - Fixed TypeScript errors
 import React, { useState, useEffect } from 'react';
 import {
   CreditCard, DollarSign, FileText, Download, Calendar,
   CheckCircle, AlertCircle, Clock, TrendingUp,
   Shield, Info, Receipt, 
   Zap, Award, Settings, Plus,
-  Users, Star
+  Star
 } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -71,14 +71,15 @@ interface Invoice {
   created_at: string;
 }
 
-interface PaymentMethod {
-  id: string;
-  type: 'card' | 'bank';
-  last4: string;
-  brand?: string;
-  isDefault: boolean;
-  expiryDate?: string;
-}
+// Remove unused interface since we're not using payment methods in the UI yet
+// interface PaymentMethod {
+//   id: string;
+//   type: 'card' | 'bank';
+//   last4: string;
+//   brand?: string;
+//   isDefault: boolean;
+//   expiryDate?: string;
+// }
 
 interface CurrentSubscription {
   plan: string;
@@ -98,18 +99,32 @@ interface BillingStats {
   nextPaymentDate: string;
 }
 
+interface CreateSubscriptionResponse {
+  subscription_id: string;
+  client_secret: string;
+  status: string;
+}
+
+interface CreatePaymentIntentResponse {
+  client_secret: string;
+  payment_intent_id: string;
+  amount: number;
+}
+
+// Remove unused interface
+// interface PaymentMethodsResponse {
+//   payment_methods: PaymentMethod[];
+// }
+
 const ClientBilling: React.FC = () => {
-  const { user } = useAuth();
+  const { } = useAuth(); // Keep the import but remove unused user variable
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPlanSelection, setShowPlanSelection] = useState(false);
-  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<typeof AVAILABLE_PLANS[0] | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'payment' | 'subscription'>('overview');
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [billingStats, setBillingStats] = useState<BillingStats>({
     totalSpent: 0,
     currentBalance: 0,
@@ -119,12 +134,11 @@ const ClientBilling: React.FC = () => {
 
   // Stripe Elements
   const [stripe, setStripe] = useState<any>(null);
-  const [elements, setElements] = useState<any>(null);
 
   useEffect(() => {
-    // Load Stripe
+    // Load Stripe - Fixed: Use import.meta.env instead of process.env
     if (window.Stripe) {
-      setStripe(window.Stripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY));
+      setStripe(window.Stripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY));
     }
     
     fetchBillingData();
@@ -133,16 +147,21 @@ const ClientBilling: React.FC = () => {
   const fetchBillingData = async () => {
     try {
       setLoading(true);
-      const [invoicesData, subscriptionData, paymentMethodsData] = await Promise.all([
+      const [invoicesData, subscriptionData] = await Promise.all([
         ApiService.getInvoices(),
         ApiService.getCurrentSubscription(),
-        ApiService.getPaymentMethods()
+        // Remove unused API call since we're not using payment methods yet
+        // ApiService.getPaymentMethods()
       ]);
 
       const invoicesArray = Array.isArray(invoicesData) ? invoicesData : [];
       setInvoices(invoicesArray);
-      setCurrentSubscription(subscriptionData);
-      setPaymentMethods(paymentMethodsData || []);
+      
+      // Fixed: Type assertion for subscription data
+      setCurrentSubscription(subscriptionData as CurrentSubscription | null);
+      
+      // Fixed: Type assertion for payment methods data, but not using the response since it's not needed
+      // const paymentMethodsResponse = paymentMethodsData as PaymentMethodsResponse;
       
       // Calculate billing stats
       const totalSpent = invoicesArray
@@ -156,8 +175,8 @@ const ClientBilling: React.FC = () => {
       setBillingStats({
         totalSpent,
         currentBalance,
-        nextPayment: subscriptionData?.price || 0,
-        nextPaymentDate: subscriptionData?.next_billing_date || new Date().toISOString(),
+        nextPayment: (subscriptionData as CurrentSubscription)?.price || 0,
+        nextPaymentDate: (subscriptionData as CurrentSubscription)?.next_billing_date || new Date().toISOString(),
       });
 
       // Show plan selection if no subscription
@@ -181,14 +200,14 @@ const ClientBilling: React.FC = () => {
     if (!selectedPlan || !stripe) return;
 
     try {
-      // Create subscription with Stripe
-      const { client_secret, subscription_id } = await ApiService.createSubscription({
+      // Create subscription with Stripe - Fixed: Type assertion
+      const response = await ApiService.createSubscription({
         price_id: selectedPlan.stripePrice,
         plan_name: selectedPlan.name
-      });
+      }) as CreateSubscriptionResponse;
 
-      // Confirm the payment
-      const { error } = await stripe.confirmCardPayment(client_secret);
+      // Confirm the payment - Fixed: Access properties safely
+      const { error } = await stripe.confirmCardPayment(response.client_secret);
 
       if (error) {
         alert(`Payment failed: ${error.message}`);
@@ -208,12 +227,13 @@ const ClientBilling: React.FC = () => {
     if (!stripe) return;
 
     try {
-      const { client_secret } = await ApiService.createPaymentIntent({
+      // Fixed: Type assertion for payment intent response
+      const response = await ApiService.createPaymentIntent({
         amount: invoice.amount,
         description: `Payment for invoice ${invoice.invoice_number}`
-      });
+      }) as CreatePaymentIntentResponse;
 
-      const { error } = await stripe.confirmCardPayment(client_secret);
+      const { error } = await stripe.confirmCardPayment(response.client_secret);
 
       if (error) {
         alert(`Payment failed: ${error.message}`);

@@ -1,4 +1,4 @@
-# server/api/views/billing_views.py
+# server/api/views/billing_views.py - Fixed version
 import stripe
 import logging
 from decimal import Decimal
@@ -12,18 +12,18 @@ from rest_framework import status
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.db import models  # Fixed import
 import json
 
 from ..models import User, Client, Invoice
 from ..serializers import InvoiceSerializer
-from server.api import models
 
 logger = logging.getLogger(__name__)
 
 # Configure Stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# Plan configurations
+# Plan configurations - updated to match frontend
 PLAN_CONFIGS = {
     'starter': {
         'name': 'Starter',
@@ -96,7 +96,8 @@ def get_current_subscription(request):
                         'subscriptionId': subscription.id
                     })
                     
-            except stripe.error.StripeError:
+            except stripe.error.StripeError as e:
+                logger.error(f"Stripe error getting subscription: {str(e)}")
                 pass
         
         return Response(None)  # No active subscription
@@ -553,6 +554,9 @@ def handle_subscription_cancelled(subscription):
         client = Client.objects.get(stripe_subscription_id=subscription['id'])
         client.status = 'paused'
         client.stripe_subscription_id = None
+        client.current_plan = None
+        client.package = 'No Plan'
+        client.monthly_fee = 0
         client.save()
         
         logger.info(f"Cancelled subscription for client {client.name}")
@@ -570,20 +574,26 @@ def get_admin_billing_settings(request):
     if request.user.role != 'admin':
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     
-    # Return current admin settings (you might want to store these in a model)
+    # Calculate revenue this month
+    current_month = timezone.now().replace(day=1)
+    total_revenue = Invoice.objects.filter(
+        status='paid',
+        paid_at__gte=current_month
+    ).aggregate(total=models.Sum('amount'))['total'] or 0
+    
+    pending_payments = Invoice.objects.filter(status='pending').count()
+    
+    # Return current admin settings
     return Response({
-        'stripe_account_connected': bool(getattr(settings, 'STRIPE_ACCOUNT_ID', None)),
-        'total_revenue_this_month': Invoice.objects.filter(
-            status='paid',
-            paid_at__month=timezone.now().month
-        ).aggregate(total=models.Sum('amount'))['total'] or 0,
-        'pending_payments': Invoice.objects.filter(status='pending').count(),
+        'stripe_account_connected': bool(getattr(settings, 'STRIPE_SECRET_KEY', None)),
+        'total_revenue_this_month': float(total_revenue),
+        'pending_payments': pending_payments,
     })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def delete_admin_account(request):
-    """Delete admin account (careful!!)"""
+    """Delete admin account (careful!)"""
     if request.user.role != 'admin':
         return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
     

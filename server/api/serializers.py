@@ -18,7 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """User registration serializer"""
+    """User registration serializer - FIXED to not auto-create subscriptions"""
     password = serializers.CharField(write_only=True, min_length=8)
     name = serializers.CharField(write_only=True)
 
@@ -35,16 +35,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         
         user = User.objects.create_user(**validated_data)
         
-        # Create client profile if role is client
+        # Create client profile if role is client - BUT NO SUBSCRIPTION
         if validated_data.get('role') == 'client':
             Client.objects.create(
                 user=user,
                 name=name,
                 email=validated_data['email'],
                 company=validated_data.get('company', ''),
-                package='Basic Package',
-                monthly_fee=1500,
+                package='No Plan',  # Changed from 'Basic Package'
+                monthly_fee=0,  # Changed from 1500
                 start_date=timezone.now().date(),
+                status='pending',  # Keep as pending until they choose a plan
+                payment_status='pending',  # No payment required yet
                 account_manager='Admin',
                 next_payment=timezone.now().date() + timezone.timedelta(days=30)
             )

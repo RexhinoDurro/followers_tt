@@ -1,9 +1,9 @@
-// client/src/dashboard/admin/AdminSettings.tsx
+// client/src/dashboard/admin/AdminSettings.tsx - Fixed imports and functionality
 import React, { useState, useEffect } from 'react';
 import {
-  Settings, CreditCard, DollarSign, Trash2, AlertTriangle,
-  Shield, User, Bell, Database, Download, Upload,
-  Eye, EyeOff, Check, X, Save, Loader
+  CreditCard, DollarSign, Trash2, AlertTriangle,
+  Shield, User, Bell, Download,
+  Eye, EyeOff, Check, Save, Loader
 } from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -72,8 +72,8 @@ const AdminSettings: React.FC = () => {
         ApiService.getCurrentUser()
       ]);
 
-      setBillingSettings(billingData);
-      setProfileData(userData);
+      setBillingSettings(billingData as BillingSettings);
+      setProfileData(userData as AdminProfile);
     } catch (error) {
       console.error('Failed to fetch admin data:', error);
     } finally {

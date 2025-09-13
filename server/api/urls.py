@@ -1,4 +1,4 @@
-# server/api/urls.py - Complete Fixed URL Configuration
+# server/api/urls.py - Updated with missing endpoints
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -23,6 +23,19 @@ from .views import (
     # Health check
     health_check
 )
+
+# Import auth views
+try:
+    from .views.auth_views import update_profile, change_password
+    AUTH_VIEWS_AVAILABLE = True
+except ImportError:
+    AUTH_VIEWS_AVAILABLE = False
+    # Create dummy views
+    def auth_not_available(request, *args, **kwargs):
+        return JsonResponse({'error': 'Auth functionality not available'}, status=501)
+    
+    update_profile = auth_not_available
+    change_password = auth_not_available
 
 from .views.billing_views import (
     get_current_subscription, create_subscription, cancel_subscription,
@@ -92,6 +105,7 @@ urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', logout_view, name='logout'),
     path('auth/me/', current_user_view, name='current_user'),
+    path('auth/change-password/', change_password, name='change_password'),
     
     # OAuth endpoints
     path('oauth/instagram/initiate/', initiate_instagram_oauth, name='instagram_oauth_initiate'),
@@ -123,11 +137,9 @@ urlpatterns = [
     # Stripe webhook
     path('billing/webhook/', stripe_webhook, name='stripe_webhook'),
 
-    # Admin billing
+    # Admin billing and profile endpoints
     path('admin/billing-settings/', get_admin_billing_settings, name='admin_billing_settings'),
     path('admin/delete-account/', delete_admin_account, name='delete_admin_account'),
-
-    
     
     # Analytics and reporting
     path('analytics/overview/', analytics_overview, name='analytics_overview'),
