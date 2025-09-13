@@ -107,6 +107,8 @@ def get_current_subscription(request):
         return Response({'error': 'Internal server error'}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# Replace the create_subscription function in server/api/views/billing_views.py
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_subscription(request):
@@ -148,21 +150,16 @@ def create_subscription(request):
         else:
             customer = stripe.Customer.retrieve(client.stripe_customer_id)
         
-        # Create Stripe Price if it doesn't exist
-        try:
-            stripe_price = stripe.Price.retrieve(price_id)
-        except stripe.error.InvalidRequestError:
-            # Create the price
-            stripe_price = stripe.Price.create(
-                unit_amount=int(plan_config['price'] * 100),  # Convert to cents
-                currency='usd',
-                recurring={'interval': 'month'},
-                product_data={
-                    'name': f"Instagram Growth - {plan_config['name']} Plan",
-                    'description': f"{plan_config['name']} plan with {len(plan_config['features'])} features"
-                },
-                lookup_key=price_id,
-            )
+        # FIXED: Create price every time with unique parameters - no lookup_key
+        stripe_price = stripe.Price.create(
+            unit_amount=int(plan_config['price'] * 100),  # Convert to cents
+            currency='usd',
+            recurring={'interval': 'month'},
+            product_data={
+                'name': f"Instagram Growth - {plan_config['name']} Plan"
+            }
+            # Removed lookup_key to avoid conflicts
+        )
         
         # Create subscription
         subscription = stripe.Subscription.create(

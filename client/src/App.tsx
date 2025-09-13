@@ -15,6 +15,7 @@ import Contact from './pages/Contact';
 import HowItWorksPage from './pages/HowItWorksPage';
 import PricingPage from './pages/PricingPage';
 import CartPage from './pages/CartPage';
+import OrderConfirmation from './pages/OrderConfirmation';
 import InstagramGrowth from './pages/services/InstagramGrowth';
 
 
@@ -194,7 +195,7 @@ const AppContent: React.FC = () => {
           <div className="min-h-screen bg-gray-50">
             <Header />
             <main>
-              <PlaceholderPage title="Order Confirmed" description="Thank you for your purchase!" />
+              <OrderConfirmation />
             </main>
             <Footer />
           </div>
