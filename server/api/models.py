@@ -115,7 +115,7 @@ class PostMetrics(models.Model):
         ordering = ['-posted_at']
 
 class Client(models.Model):
-    """Enhanced Client model"""
+    """Enhanced Client model with Stripe integration"""
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('pending', 'Pending'),
@@ -145,6 +145,18 @@ class Client(models.Model):
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # NEW STRIPE FIELDS
+    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
+    stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
+    current_plan = models.CharField(max_length=50, blank=True, null=True, choices=[
+        ('starter', 'Starter'),
+        ('pro', 'Pro'),
+        ('premium', 'Premium'),
+    ])
+    subscription_start_date = models.DateTimeField(blank=True, null=True)
+    subscription_end_date = models.DateTimeField(blank=True, null=True)
+    trial_end_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} - {self.company}"
@@ -169,6 +181,11 @@ class Client(models.Model):
         
         total_engagement = sum(metric.engagement_rate for metric in latest_metrics)
         return total_engagement / len(latest_metrics)
+
+    @property
+    def has_active_subscription(self):
+        """Check if client has an active Stripe subscription"""
+        return bool(self.stripe_subscription_id and self.status == 'active')
 
     class Meta:
         ordering = ['-created_at']

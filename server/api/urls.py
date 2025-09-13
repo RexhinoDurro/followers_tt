@@ -24,6 +24,12 @@ from .views import (
     health_check
 )
 
+from .views.billing_views import (
+    get_current_subscription, create_subscription, cancel_subscription,
+    create_payment_intent, get_payment_methods, create_setup_intent,
+    stripe_webhook, get_admin_billing_settings, delete_admin_account
+)
+
 # Import message views
 try:
     from .views.message_views import (
@@ -105,6 +111,23 @@ urlpatterns = [
     
     # Real-time metrics endpoints
     path('metrics/realtime/', get_realtime_metrics, name='realtime_metrics'),
+    
+    # Billing endpoints
+    path('billing/subscription/', get_current_subscription, name='current_subscription'),
+    path('billing/create-subscription/', create_subscription, name='create_subscription'),
+    path('billing/cancel-subscription/', cancel_subscription, name='cancel_subscription'),
+    path('billing/create-payment-intent/', create_payment_intent, name='create_payment_intent'),
+    path('billing/payment-methods/', get_payment_methods, name='payment_methods'),
+    path('billing/create-setup-intent/', create_setup_intent, name='create_setup_intent'),
+
+    # Stripe webhook
+    path('billing/webhook/', stripe_webhook, name='stripe_webhook'),
+
+    # Admin billing
+    path('admin/billing-settings/', get_admin_billing_settings, name='admin_billing_settings'),
+    path('admin/delete-account/', delete_admin_account, name='delete_admin_account'),
+
+    
     
     # Analytics and reporting
     path('analytics/overview/', analytics_overview, name='analytics_overview'),

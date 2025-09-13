@@ -198,6 +198,11 @@ GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 YOUTUBE_REDIRECT_URI = config('YOUTUBE_REDIRECT_URI', default=f"{FRONTEND_URL}/auth/youtube/callback")
 
+# Stripe
+STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+
 # TikTok API (when available)
 TIKTOK_CLIENT_KEY = config('TIKTOK_CLIENT_KEY', default='')
 TIKTOK_CLIENT_SECRET = config('TIKTOK_CLIENT_SECRET', default='')
