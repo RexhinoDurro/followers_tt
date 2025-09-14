@@ -4,7 +4,7 @@ class ApiService {
   private token: string | null;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    this.baseURL = import.meta.env.VITE_API_URL || 'https://visionboost.agency/api';
     this.token = localStorage.getItem('auth_token');
   }
 
@@ -14,7 +14,7 @@ class ApiService {
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+        ...(this.token && { Authorization: `Token ${this.token}` }),
         ...options.headers,
       },
       ...options,

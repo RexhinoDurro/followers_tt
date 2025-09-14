@@ -1,4 +1,5 @@
-// 2. Create client/src/components/StripeElements.tsx
+// Replace the entire StripeElements.tsx file with this fixed version
+
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Lock } from 'lucide-react';
 
@@ -63,6 +64,7 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     event.preventDefault();
 
     if (!stripe || !elements || !card) {
+      onError('Stripe has not loaded yet. Please try again.');
       return;
     }
 
@@ -70,20 +72,31 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     setError(null);
 
     try {
+      // FIXED: For subscriptions, use confirmCardPayment with payment_method_data
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: card,
+          billing_details: {
+            name: 'Customer Name', // You can get this from user context if available
+          },
         }
       });
 
       if (error) {
+        console.error('Payment confirmation error:', error);
         setError(error.message);
         onError(error.message);
-      } else if (paymentIntent.status === 'succeeded') {
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        console.log('Payment succeeded:', paymentIntent);
         onSuccess();
+      } else {
+        console.log('Payment status:', paymentIntent?.status);
+        setError('Payment was not completed successfully');
+        onError('Payment was not completed successfully');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      console.error('Payment error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       setError(errorMessage);
       onError(errorMessage);
     } finally {
@@ -143,6 +156,17 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
             {processing ? 'Processing...' : `Pay ${formatCurrency(amount)}`}
           </button>
         </form>
+
+        {/* Test Card Info for Development */}
+        {import.meta.env.MODE === 'development' && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              <strong>Test Card:</strong> 4242 4242 4242 4242<br />
+              <strong>Expiry:</strong> Any future date<br />
+              <strong>CVC:</strong> Any 3 digits
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
