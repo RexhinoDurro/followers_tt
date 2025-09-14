@@ -1,7 +1,8 @@
-// Create client/src/components/SubscriptionPayment.tsx
+// Fixed client/src/components/SubscriptionPayment.tsx
 
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Lock, CheckCircle } from 'lucide-react';
+import ApiService from '../services/ApiService'; // Import ApiService
 
 interface Plan {
   id: string;
@@ -82,7 +83,7 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
         cardElement.unmount();
       };
     }
-  }, [step, stripe]); // Re-run when step or stripe changes
+  }, [step, stripe]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -98,24 +99,11 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
       
       console.log('Creating subscription for plan:', plan);
       
-      // Create subscription and get client secret
-      const response = await fetch('/api/billing/create-subscription/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({
-          price_id: plan.stripePrice,
-          plan_name: plan.name
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create subscription');
-      }
+      // FIXED: Use ApiService instead of direct fetch
+      const data = await ApiService.createSubscription({
+        price_id: plan.stripePrice,
+        plan_name: plan.name
+      }) as { client_secret: string };
 
       console.log('Subscription created:', data);
       
@@ -263,6 +251,13 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
                 {processing ? 'Setting up...' : 'Continue to Payment'}
               </button>
             </div>
+
+            {/* Show error if subscription creation fails */}
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
           </div>
         )}
 
