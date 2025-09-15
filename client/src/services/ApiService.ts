@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts - Enhanced with plan management methods
+// client/src/services/ApiService.ts - Enhanced with complete billing functionality
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -412,6 +412,11 @@ class ApiService {
 
   // ============ ENHANCED STRIPE/BILLING METHODS ============
   
+  // Get available subscription plans
+  async getAvailablePlans() {
+    return await this.request('/billing/plans/');
+  }
+
   // Get current subscription
   async getCurrentSubscription() {
     return await this.request('/billing/subscription/');
@@ -426,14 +431,17 @@ class ApiService {
   }
 
   // Cancel subscription with options
-  async cancelSubscription(data?: { cancel_immediately?: boolean }) {
+  async cancelSubscription(data?: { 
+    cancel_immediately?: boolean; 
+    reason?: string;
+  }) {
     return await this.request('/billing/cancel-subscription/', {
       method: 'POST',
       body: JSON.stringify(data || {}),
     });
   }
 
-  // NEW: Change subscription plan with proration
+  // Change subscription plan with proration
   async changeSubscriptionPlan(data: { plan_id: string }) {
     return await this.request('/billing/change-plan/', {
       method: 'POST',
@@ -441,7 +449,21 @@ class ApiService {
     });
   }
 
-  // Create payment intent for one-time payments with enhanced options
+  // Reactivate cancelled subscription
+  async reactivateSubscription() {
+    return await this.request('/billing/reactivate-subscription/', {
+      method: 'POST',
+    });
+  }
+
+  // Pay specific invoice
+  async payInvoice(invoiceId: string) {
+    return await this.request(`/billing/invoices/${invoiceId}/pay/`, {
+      method: 'POST',
+    });
+  }
+
+  // Create payment intent for one-time payments
   async createPaymentIntent(data: { 
     amount: number; 
     description?: string; 
@@ -453,7 +475,7 @@ class ApiService {
     });
   }
 
-  // Get payment methods
+  // Get saved payment methods
   async getPaymentMethods() {
     return await this.request('/billing/payment-methods/');
   }
@@ -462,6 +484,20 @@ class ApiService {
   async createSetupIntent() {
     return await this.request('/billing/create-setup-intent/', {
       method: 'POST',
+    });
+  }
+
+  // Set default payment method
+  async setDefaultPaymentMethod(paymentMethodId: string) {
+    return await this.request(`/billing/payment-methods/${paymentMethodId}/set-default/`, {
+      method: 'POST',
+    });
+  }
+
+  // Delete payment method
+  async deletePaymentMethod(paymentMethodId: string) {
+    return await this.request(`/billing/payment-methods/${paymentMethodId}/delete/`, {
+      method: 'DELETE',
     });
   }
 

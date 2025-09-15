@@ -1,4 +1,4 @@
-# server/api/urls.py - Updated with plan management endpoints
+# server/api/urls.py - Updated with new billing endpoints
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -30,19 +30,19 @@ try:
     AUTH_VIEWS_AVAILABLE = True
 except ImportError:
     AUTH_VIEWS_AVAILABLE = False
-    # Create dummy views
     def auth_not_available(request, *args, **kwargs):
         return JsonResponse({'error': 'Auth functionality not available'}, status=501)
     
     update_profile = auth_not_available
     change_password = auth_not_available
 
-# Import enhanced billing views
+# Import enhanced billing views - UPDATED with new endpoints
 from .views.billing_views import (
-    get_current_subscription, create_subscription, cancel_subscription,
-    create_payment_intent, get_payment_methods, create_setup_intent,
-    stripe_webhook, get_admin_billing_settings, delete_admin_account,
-    change_subscription_plan  # NEW: Import the new plan change function
+    get_available_plans, get_current_subscription, create_subscription, 
+    change_subscription_plan, cancel_subscription, reactivate_subscription,
+    pay_invoice, get_payment_methods, create_setup_intent,
+    set_default_payment_method, delete_payment_method,
+    stripe_webhook, get_admin_billing_settings, delete_admin_account
 )
 
 # Import message views
@@ -54,7 +54,6 @@ try:
     MESSAGE_VIEWS_AVAILABLE = True
 except ImportError:
     MESSAGE_VIEWS_AVAILABLE = False
-    # Create dummy views
     def message_not_available(request, *args, **kwargs):
         return JsonResponse({'error': 'Message functionality not available'}, status=501)
     
@@ -73,10 +72,8 @@ try:
     )
     OAUTH_ENABLED = True
 except ImportError:
-    # Fallback if oauth_views doesn't exist
     OAUTH_ENABLED = False
     
-    # Create dummy views to prevent URL errors
     def oauth_not_available(request, *args, **kwargs):
         return JsonResponse({'error': 'OAuth functionality not available'}, status=501)
     
@@ -128,14 +125,23 @@ urlpatterns = [
     # Real-time metrics endpoints
     path('metrics/realtime/', get_realtime_metrics, name='realtime_metrics'),
     
-    # Enhanced Billing endpoints
+    # ENHANCED BILLING ENDPOINTS
+    # Subscription management
+    path('billing/plans/', get_available_plans, name='available_plans'),
     path('billing/subscription/', get_current_subscription, name='current_subscription'),
     path('billing/create-subscription/', create_subscription, name='create_subscription'),
+    path('billing/change-plan/', change_subscription_plan, name='change_subscription_plan'),
     path('billing/cancel-subscription/', cancel_subscription, name='cancel_subscription'),
-    path('billing/change-plan/', change_subscription_plan, name='change_subscription_plan'),  # NEW: Plan change endpoint
-    path('billing/create-payment-intent/', create_payment_intent, name='create_payment_intent'),
+    path('billing/reactivate-subscription/', reactivate_subscription, name='reactivate_subscription'),
+    
+    # Invoice payments
+    path('billing/invoices/<uuid:invoice_id>/pay/', pay_invoice, name='pay_invoice'),
+    
+    # Payment method management
     path('billing/payment-methods/', get_payment_methods, name='payment_methods'),
     path('billing/create-setup-intent/', create_setup_intent, name='create_setup_intent'),
+    path('billing/payment-methods/<str:payment_method_id>/set-default/', set_default_payment_method, name='set_default_payment_method'),
+    path('billing/payment-methods/<str:payment_method_id>/delete/', delete_payment_method, name='delete_payment_method'),
 
     # Stripe webhook
     path('billing/webhook/', stripe_webhook, name='stripe_webhook'),
@@ -151,12 +157,12 @@ urlpatterns = [
     # Health check
     path('health/', health_check, name='health_check'),
     
-    # Message endpoints - Add custom endpoints before the router registration
+    # Message endpoints
     path('messages/send-to-admin/', send_message_to_admin, name='send_message_to_admin'),
     path('messages/send-to-client/', send_message_to_client, name='send_message_to_client'),
     path('messages/admin-conversations/', get_admin_conversations, name='admin_conversations'),
     path('messages/conversation/<uuid:user_id>/', get_conversation_messages, name='conversation_messages'),
     
-    # Include router URLs - this automatically includes all ViewSet endpoints
+    # Include router URLs
     path('', include(router.urls)),
 ]

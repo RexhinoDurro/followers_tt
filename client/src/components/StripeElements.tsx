@@ -1,6 +1,6 @@
-// client/src/components/StripeElements.tsx - Enhanced Professional Version
+// client/src/components/StripeElements.tsx - Complete Enhanced Version
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Lock, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { CreditCard, Lock, AlertCircle, CheckCircle2, Loader2, Shield, FileText } from 'lucide-react';
 
 interface StripeElementsProps {
   clientSecret: string;
@@ -10,6 +10,8 @@ interface StripeElementsProps {
   description: string;
   isSubscription?: boolean;
   planName?: string;
+  isSetup?: boolean; // For adding payment methods
+  invoiceNumber?: string; // For invoice payments
 }
 
 export const StripeElements: React.FC<StripeElementsProps> = ({
@@ -19,7 +21,9 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
   amount,
   description,
   isSubscription = false,
-  planName
+  planName,
+  isSetup = false,
+  invoiceNumber
 }) => {
   const [stripe, setStripe] = useState<any>(null);
   const [elements, setElements] = useState<any>(null);
@@ -116,26 +120,52 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     setError(null);
 
     try {
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: card,
-          billing_details: {
-            name: 'Customer Name',
-          },
-        }
-      });
+      if (isSetup) {
+        // Handle setup intent for saving payment methods
+        const { error, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+          payment_method: {
+            card: card,
+            billing_details: {
+              name: 'Customer Name',
+            },
+          }
+        });
 
-      if (error) {
-        console.error('Payment confirmation error:', error);
-        setError(error.message);
-        onError(error.message);
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        console.log('Payment succeeded:', paymentIntent);
-        onSuccess();
+        if (error) {
+          console.error('Setup error:', error);
+          setError(error.message);
+          onError(error.message);
+        } else if (setupIntent && setupIntent.status === 'succeeded') {
+          console.log('Payment method saved:', setupIntent);
+          onSuccess();
+        } else {
+          console.log('Setup status:', setupIntent?.status);
+          setError('Payment method setup was not completed successfully');
+          onError('Payment method setup was not completed successfully');
+        }
       } else {
-        console.log('Payment status:', paymentIntent?.status);
-        setError('Payment was not completed successfully');
-        onError('Payment was not completed successfully');
+        // Handle payment intent for subscriptions or one-time payments
+        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: card,
+            billing_details: {
+              name: 'Customer Name',
+            },
+          }
+        });
+
+        if (error) {
+          console.error('Payment confirmation error:', error);
+          setError(error.message);
+          onError(error.message);
+        } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+          console.log('Payment succeeded:', paymentIntent);
+          onSuccess();
+        } else {
+          console.log('Payment status:', paymentIntent?.status);
+          setError('Payment was not completed successfully');
+          onError('Payment was not completed successfully');
+        }
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -169,6 +199,48 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     }
   };
 
+  const getHeaderContent = () => {
+    if (isSetup) {
+      return {
+        title: 'Add Payment Method',
+        subtitle: 'Save a payment method for future use',
+        amount: null
+      };
+    } else if (invoiceNumber) {
+      return {
+        title: `Pay Invoice ${invoiceNumber}`,
+        subtitle: 'Complete payment for your invoice',
+        amount: formatCurrency(amount)
+      };
+    } else if (isSubscription) {
+      return {
+        title: `Subscribe to ${planName}`,
+        subtitle: 'Start your subscription today',
+        amount: formatCurrency(amount)
+      };
+    } else {
+      return {
+        title: 'Complete Payment',
+        subtitle: description,
+        amount: formatCurrency(amount)
+      };
+    }
+  };
+
+  const getButtonText = () => {
+    if (isSetup) {
+      return 'Save Payment Method';
+    } else if (invoiceNumber) {
+      return `Pay ${formatCurrency(amount)}`;
+    } else if (isSubscription) {
+      return `Subscribe for ${formatCurrency(amount)}/month`;
+    } else {
+      return `Pay ${formatCurrency(amount)}`;
+    }
+  };
+
+  const headerContent = getHeaderContent();
+
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
@@ -176,16 +248,27 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white">
           <div className="flex items-center justify-center mb-4">
             <div className="bg-white/20 p-3 rounded-full">
-              <CreditCard className="w-8 h-8" />
+              {isSetup ? (
+                <CreditCard className="w-8 h-8" />
+              ) : invoiceNumber ? (
+                <FileText className="w-8 h-8" />
+              ) : (
+                <CreditCard className="w-8 h-8" />
+              )}
             </div>
           </div>
           <h3 className="text-xl font-semibold text-center mb-2">
-            {isSubscription ? `Subscribe to ${planName}` : 'Complete Payment'}
+            {headerContent.title}
           </h3>
-          <div className="text-center">
-            <span className="text-3xl font-bold">{formatCurrency(amount)}</span>
-            {isSubscription && <span className="text-purple-100 ml-2">/month</span>}
-          </div>
+          <p className="text-center text-purple-100 mb-2">
+            {headerContent.subtitle}
+          </p>
+          {headerContent.amount && (
+            <div className="text-center">
+              <span className="text-3xl font-bold">{headerContent.amount}</span>
+              {isSubscription && <span className="text-purple-100 ml-2">/month</span>}
+            </div>
+          )}
         </div>
 
         {/* Payment Form */}
@@ -235,27 +318,35 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
               </div>
             </div>
 
-            {/* Payment Summary */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">{description}</span>
-                <span className="font-semibold">{formatCurrency(amount)}</span>
-              </div>
-              {isSubscription && (
-                <>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Billing cycle</span>
-                    <span className="text-gray-500">Monthly</span>
-                  </div>
-                  <div className="border-t border-gray-200 pt-2 mt-2">
-                    <div className="flex justify-between items-center font-semibold">
-                      <span>Due today</span>
-                      <span>{formatCurrency(amount)}</span>
+            {/* Payment Summary (only for payments, not setup) */}
+            {!isSetup && (
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">{description}</span>
+                  <span className="font-semibold">{formatCurrency(amount)}</span>
+                </div>
+                {isSubscription && (
+                  <>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500">Billing cycle</span>
+                      <span className="text-gray-500">Monthly</span>
                     </div>
+                    <div className="border-t border-gray-200 pt-2 mt-2">
+                      <div className="flex justify-between items-center font-semibold">
+                        <span>Due today</span>
+                        <span>{formatCurrency(amount)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {invoiceNumber && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Invoice</span>
+                    <span className="text-gray-500">#{invoiceNumber}</span>
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <button
               type="submit"
@@ -272,7 +363,7 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
                   <span>Processing...</span>
                 </div>
               ) : (
-                `Pay ${formatCurrency(amount)}`
+                getButtonText()
               )}
             </button>
           </form>
@@ -284,9 +375,35 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
               <div className="text-xs text-blue-700 space-y-1">
                 <p><strong>Success:</strong> 4242 4242 4242 4242</p>
                 <p><strong>Declined:</strong> 4000 0000 0000 0002</p>
+                <p><strong>3D Secure:</strong> 4000 0025 0000 3155</p>
                 <p><strong>Expiry:</strong> Any future date</p>
                 <p><strong>CVC:</strong> Any 3 digits</p>
                 <p><strong>ZIP:</strong> Any valid ZIP code</p>
+              </div>
+            </div>
+          )}
+
+          {/* Additional Info */}
+          {isSetup && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-start">
+                <Shield className="w-5 h-5 text-green-600 mt-0.5 mr-3" />
+                <div className="text-sm text-green-800">
+                  <p className="font-medium">Secure Storage</p>
+                  <p>Your payment method will be securely saved for future use. You can remove it anytime from your billing settings.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isSubscription && (
+            <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <div className="text-sm text-purple-800 space-y-1">
+                <p className="font-medium">Subscription Terms:</p>
+                <p>• Your subscription will renew automatically each month</p>
+                <p>• You can cancel or change your plan anytime</p>
+                <p>• 30-day money-back guarantee</p>
+                <p>• No setup fees or hidden charges</p>
               </div>
             </div>
           )}
