@@ -1,12 +1,11 @@
-// client/src/dashboard/client/ClientBilling.tsx - Fixed TypeScript errors
+// client/src/dashboard/client/ClientBilling.tsx - Enhanced with proper plan management
 import React, { useState, useEffect } from 'react';
 import {
   CreditCard, DollarSign, FileText, Download, Calendar,
   CheckCircle, AlertCircle, Clock, TrendingUp,
   Shield, Receipt, 
-  Zap, Award, Settings, Plus,
-  Star
-} from 'lucide-react';
+  Award, Settings, Plus,
+  Star, ArrowUpDown} from 'lucide-react';
 import { SubscriptionPayment } from '../../components/SubscriptionPayment';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -26,7 +25,7 @@ const AVAILABLE_PLANS = [
       'Monthly reports',
       'Ideal for small businesses',
     ],
-    stripePrice: 'price_starter_monthly' // You'll need to create these in Stripe
+    stripePrice: 'price_starter_monthly'
   },
   {
     id: 'pro',
@@ -72,16 +71,6 @@ interface Invoice {
   created_at: string;
 }
 
-// Remove unused interface since we're not using payment methods in the UI yet
-// interface PaymentMethod {
-//   id: string;
-//   type: 'card' | 'bank';
-//   last4: string;
-//   brand?: string;
-//   isDefault: boolean;
-//   expiryDate?: string;
-// }
-
 interface CurrentSubscription {
   plan: string;
   planId: string;
@@ -107,11 +96,12 @@ interface CreatePaymentIntentResponse {
 }
 
 const ClientBilling: React.FC = () => {
-  const { } = useAuth(); // Keep the import but remove unused user variable
+  const { } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPlanSelection, setShowPlanSelection] = useState(false);
   const [showSubscriptionPayment, setShowSubscriptionPayment] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<typeof AVAILABLE_PLANS[0] | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'payment' | 'subscription'>('overview');
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
@@ -121,6 +111,8 @@ const ClientBilling: React.FC = () => {
     nextPayment: 0,
     nextPaymentDate: new Date().toISOString(),
   });
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [cancellingPlan, setCancellingPlan] = useState(false);
 
   useEffect(() => {
     fetchBillingData();
@@ -132,18 +124,12 @@ const ClientBilling: React.FC = () => {
       const [invoicesData, subscriptionData] = await Promise.all([
         ApiService.getInvoices(),
         ApiService.getCurrentSubscription(),
-        // Remove unused API call since we're not using payment methods yet
-        // ApiService.getPaymentMethods()
       ]);
 
       const invoicesArray = Array.isArray(invoicesData) ? invoicesData : [];
       setInvoices(invoicesArray);
       
-      // Fixed: Type assertion for subscription data
       setCurrentSubscription(subscriptionData as CurrentSubscription | null);
-      
-      // Fixed: Type assertion for payment methods data, but not using the response since it's not needed
-      // const paymentMethodsResponse = paymentMethodsData as PaymentMethodsResponse;
       
       // Calculate billing stats
       const totalSpent = invoicesArray
@@ -173,9 +159,40 @@ const ClientBilling: React.FC = () => {
   };
 
   const handleSelectPlan = (plan: typeof AVAILABLE_PLANS[0]) => {
-    setSelectedPlan(plan);
-    setShowSubscriptionPayment(true);
-    setShowPlanSelection(false);
+    if (currentSubscription) {
+      // This is a plan change
+      handleChangePlan(plan);
+    } else {
+      // This is a new subscription
+      setSelectedPlan(plan);
+      setShowSubscriptionPayment(true);
+      setShowPlanSelection(false);
+    }
+  };
+
+  const handleChangePlan = async (newPlan: typeof AVAILABLE_PLANS[0]) => {
+    if (!currentSubscription) return;
+
+    try {
+      setChangingPlan(true);
+      
+      const response = await ApiService.changeSubscriptionPlan({
+        plan_id: newPlan.id
+      });
+
+      const typedResponse = response as { message?: string; proration_amount?: number };
+
+      if (typedResponse.message) {
+        alert(`✅ ${typedResponse.message}\nProration amount: $${typedResponse.proration_amount}`);
+        await fetchBillingData(); // Refresh data
+        setShowPlanSelection(false);
+      }
+    } catch (error) {
+      console.error('Failed to change plan:', error);
+      alert('Failed to change plan. Please try again.');
+    } finally {
+      setChangingPlan(false);
+    }
   };
 
   const handlePaymentCancel = () => {
@@ -187,10 +204,10 @@ const ClientBilling: React.FC = () => {
     try {
       const response = await ApiService.createPaymentIntent({
         amount: invoice.amount,
-        description: `Payment for invoice ${invoice.invoice_number}`
+        description: `Payment for invoice ${invoice.invoice_number}`,
+        invoice_id: invoice.id
       }) as CreatePaymentIntentResponse;
       
-      // Here we could show a payment modal, but for now just alert
       alert('Payment feature coming soon!');
       console.log('Payment intent created:', response);
     } catch (error) {
@@ -199,18 +216,27 @@ const ClientBilling: React.FC = () => {
     }
   };
 
-  const handleCancelSubscription = async () => {
+  const handleCancelSubscription = async (cancelImmediately: boolean = false) => {
     if (!currentSubscription?.subscriptionId) return;
 
-    if (confirm('Are you sure you want to cancel your subscription?')) {
-      try {
-        await ApiService.cancelSubscription();
-        alert('Subscription cancelled successfully');
+    try {
+      setCancellingPlan(true);
+      
+      const response = await ApiService.cancelSubscription({
+        cancel_immediately: cancelImmediately
+      });
+      
+      const typedResponse = response as { message?: string };
+      if (typedResponse.message) {
+        alert(`✅ ${typedResponse.message}`);
         await fetchBillingData();
-      } catch (error) {
-        console.error('Failed to cancel subscription:', error);
-        alert('Failed to cancel subscription');
+        setShowCancelModal(false);
       }
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error);
+      alert('Failed to cancel subscription. Please try again.');
+    } finally {
+      setCancellingPlan(false);
     }
   };
 
@@ -225,6 +251,25 @@ const ClientBilling: React.FC = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(amount);
+  };
+
+  const getPlanComparisonInfo = (planId: string) => {
+    if (!currentSubscription) return null;
+    
+    const currentPlan = AVAILABLE_PLANS.find(p => p.id === currentSubscription.planId);
+    const targetPlan = AVAILABLE_PLANS.find(p => p.id === planId);
+    
+    if (!currentPlan || !targetPlan) return null;
+    
+    const isUpgrade = targetPlan.price > currentPlan.price;
+    const priceDiff = Math.abs(targetPlan.price - currentPlan.price);
+    
+    return {
+      isUpgrade,
+      isCurrent: planId === currentSubscription.planId,
+      priceDiff,
+      actionText: isUpgrade ? 'Upgrade' : 'Downgrade'
+    };
   };
 
   if (loading) {
@@ -244,10 +289,15 @@ const ClientBilling: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage your subscription and payment methods</p>
         </div>
         {currentSubscription && (
-          <Button onClick={handleUpgradePlan}>
-            <Zap className="w-4 h-4 mr-2" />
-            {currentSubscription.planId === 'premium' ? 'Manage Plan' : 'Upgrade Plan'}
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setShowCancelModal(true)}>
+              Cancel Plan
+            </Button>
+            <Button onClick={handleUpgradePlan}>
+              <ArrowUpDown className="w-4 h-4 mr-2" />
+              Change Plan
+            </Button>
+          </div>
         )}
       </div>
 
@@ -266,7 +316,7 @@ const ClientBilling: React.FC = () => {
         </Card>
       )}
 
-      {/* Billing Overview Cards - Only show if user has subscription */}
+      {/* Billing Overview Cards */}
       {currentSubscription && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
@@ -317,7 +367,7 @@ const ClientBilling: React.FC = () => {
         </div>
       )}
 
-      {/* Tab Navigation - Only show if user has subscription */}
+      {/* Tab Navigation */}
       {currentSubscription && (
         <div className="bg-white rounded-xl shadow-sm border">
           <div className="border-b">
@@ -390,7 +440,7 @@ const ClientBilling: React.FC = () => {
                         <Button variant="outline" className="flex-1" onClick={handleUpgradePlan}>
                           Change Plan
                         </Button>
-                        <Button variant="outline" className="flex-1" onClick={handleCancelSubscription}>
+                        <Button variant="outline" className="flex-1" onClick={() => setShowCancelModal(true)}>
                           Cancel Subscription
                         </Button>
                       </div>
@@ -527,46 +577,57 @@ const ClientBilling: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {AVAILABLE_PLANS.map((plan) => (
-                    <Card 
-                      key={plan.id}
-                      className={`border-2 ${
-                        currentSubscription.planId === plan.id 
-                          ? 'border-purple-500' 
-                          : plan.popular 
-                            ? 'border-purple-300 hover:border-purple-400' 
-                            : 'border hover:border-gray-300'
-                      } transition-colors`}
-                    >
-                      <div className="text-center">
-                        {plan.popular && (
-                          <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
-                            <Star className="w-6 h-6 text-purple-600" />
-                          </div>
-                        )}
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{plan.name}</h3>
-                        <p className="text-gray-600 mb-4">
-                          {plan.id === 'starter' ? 'Perfect for beginners' :
-                           plan.id === 'pro' ? 'Perfect for growing businesses' :
-                           'Perfect for established brands'}
-                        </p>
-                        <p className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(plan.price)}</p>
-                        <p className="text-gray-600 mb-4">per month</p>
-                        
-                        {currentSubscription.planId === plan.id ? (
-                          <Badge variant="primary">Current Plan</Badge>
-                        ) : currentSubscription.price < plan.price ? (
-                          <Button className="w-full" onClick={() => handleSelectPlan(plan)}>
-                            Upgrade
-                          </Button>
-                        ) : (
-                          <Button variant="outline" className="w-full" onClick={() => handleSelectPlan(plan)}>
-                            Downgrade
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
+                  {AVAILABLE_PLANS.map((plan) => {
+                    const comparisonInfo = getPlanComparisonInfo(plan.id);
+                    
+                    return (
+                      <Card 
+                        key={plan.id}
+                        className={`border-2 ${
+                          comparisonInfo?.isCurrent 
+                            ? 'border-purple-500 bg-purple-50' 
+                            : plan.popular 
+                              ? 'border-purple-300 hover:border-purple-400' 
+                              : 'border hover:border-gray-300'
+                        } transition-colors`}
+                      >
+                        <div className="text-center">
+                          {plan.popular && !comparisonInfo?.isCurrent && (
+                            <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4">
+                              <Star className="w-6 h-6 text-purple-600" />
+                            </div>
+                          )}
+                          
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">{plan.name}</h3>
+                          <p className="text-gray-600 mb-4">
+                            {plan.id === 'starter' ? 'Perfect for beginners' :
+                             plan.id === 'pro' ? 'Perfect for growing businesses' :
+                             'Perfect for established brands'}
+                          </p>
+                          <p className="text-3xl font-bold text-gray-900 mb-1">{formatCurrency(plan.price)}</p>
+                          <p className="text-gray-600 mb-4">per month</p>
+                          
+                          {comparisonInfo?.isCurrent ? (
+                            <Badge variant="primary">Current Plan</Badge>
+                          ) : (
+                            <Button 
+                              className="w-full" 
+                              onClick={() => handleSelectPlan(plan)}
+                              disabled={changingPlan}
+                              variant={comparisonInfo?.isUpgrade ? 'primary' : 'outline'}
+                            >
+                              {changingPlan ? 'Changing...' : comparisonInfo?.actionText || 'Select'}
+                              {comparisonInfo && (
+                                <span className="ml-2">
+                                  ({comparisonInfo.isUpgrade ? '+' : '-'}${comparisonInfo.priceDiff})
+                                </span>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -578,45 +639,126 @@ const ClientBilling: React.FC = () => {
       <Modal
         isOpen={showPlanSelection}
         onClose={() => setShowPlanSelection(false)}
-        title="Choose Your Plan"
+        title={currentSubscription ? "Change Your Plan" : "Choose Your Plan"}
         size="xl"
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {AVAILABLE_PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              className={`relative bg-white rounded-2xl shadow-lg ${
-                plan.popular ? 'ring-2 ring-purple-500 transform scale-105' : ''
-              } transition-all duration-300 hover:shadow-xl cursor-pointer`}
-              onClick={() => handleSelectPlan(plan)}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center">
-                    <Star className="w-4 h-4 mr-1" />
-                    Most Popular
-                  </span>
-                </div>
-              )}
+          {AVAILABLE_PLANS.map((plan) => {
+            const comparisonInfo = getPlanComparisonInfo(plan.id);
+            
+            return (
+              <div
+                key={plan.id}
+                className={`relative bg-white rounded-2xl shadow-lg ${
+                  plan.popular && !comparisonInfo?.isCurrent ? 'ring-2 ring-purple-500 transform scale-105' : ''
+                } transition-all duration-300 hover:shadow-xl cursor-pointer`}
+                onClick={() => !comparisonInfo?.isCurrent && handleSelectPlan(plan)}
+              >
+                {plan.popular && !comparisonInfo?.isCurrent && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center">
+                      <Star className="w-4 h-4 mr-1" />
+                      Most Popular
+                    </span>
+                  </div>
+                )}
 
-              <div className="p-6">
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <div className="text-4xl font-bold text-gray-900 mb-2">{formatCurrency(plan.price)}</div>
-                  <div className="text-gray-600 mb-4">per month</div>
-                </div>
+                {comparisonInfo?.isCurrent && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-medium">
+                      Current Plan
+                    </span>
+                  </div>
+                )}
 
-                <ul className="space-y-3 mb-6">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center">
-                      <CheckCircle className="w-5 h-5 text-green-500 mr-3" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="p-6">
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                    <div className="text-4xl font-bold text-gray-900 mb-2">{formatCurrency(plan.price)}</div>
+                    <div className="text-gray-600 mb-4">per month</div>
+                    
+                    {comparisonInfo && !comparisonInfo.isCurrent && (
+                      <div className="text-sm font-medium mb-4">
+                        <span className={`${comparisonInfo.isUpgrade ? 'text-blue-600' : 'text-green-600'}`}>
+                          {comparisonInfo.actionText} ({comparisonInfo.isUpgrade ? '+' : '-'}${comparisonInfo.priceDiff})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <ul className="space-y-3 mb-6">
+                    {plan.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-center">
+                        <CheckCircle className="w-5 h-5 text-green-500 mr-3" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  {comparisonInfo?.isCurrent && (
+                    <div className="text-center text-green-600 font-medium">
+                      ✓ Your Current Plan
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      </Modal>
+
+      {/* Cancel Subscription Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        title="Cancel Subscription"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="text-center">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Are you sure?</h3>
+            <p className="text-gray-600">
+              You're about to cancel your {currentSubscription?.plan} subscription.
+            </p>
+          </div>
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-medium text-yellow-800 mb-2">What happens when you cancel:</h4>
+            <ul className="text-sm text-yellow-700 space-y-1">
+              <li>• You'll keep access until your next billing date</li>
+              <li>• No more charges after the current period</li>
+              <li>• You can reactivate anytime</li>
+            </ul>
+          </div>
+          
+          <div className="flex flex-col gap-3">
+            <Button 
+              variant="danger" 
+              onClick={() => handleCancelSubscription(false)}
+              disabled={cancellingPlan}
+              className="w-full"
+            >
+              {cancellingPlan ? 'Cancelling...' : 'Cancel at Period End'}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => handleCancelSubscription(true)}
+              disabled={cancellingPlan}
+              className="w-full"
+            >
+              {cancellingPlan ? 'Cancelling...' : 'Cancel Immediately'}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCancelModal(false)}
+              className="w-full"
+            >
+              Keep Subscription
+            </Button>
+          </div>
         </div>
       </Modal>
 

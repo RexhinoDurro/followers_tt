@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts - Complete Fixed Version with Stripe Methods
+// client/src/services/ApiService.ts - Enhanced with plan management methods
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -410,7 +410,7 @@ class ApiService {
     return await this.request('/health/');
   }
 
-  // ============ STRIPE/BILLING METHODS ============
+  // ============ ENHANCED STRIPE/BILLING METHODS ============
   
   // Get current subscription
   async getCurrentSubscription() {
@@ -425,15 +425,28 @@ class ApiService {
     });
   }
 
-  // Cancel subscription
-  async cancelSubscription() {
+  // Cancel subscription with options
+  async cancelSubscription(data?: { cancel_immediately?: boolean }) {
     return await this.request('/billing/cancel-subscription/', {
       method: 'POST',
+      body: JSON.stringify(data || {}),
     });
   }
 
-  // Create payment intent for one-time payments
-  async createPaymentIntent(data: { amount: number; description?: string }) {
+  // NEW: Change subscription plan with proration
+  async changeSubscriptionPlan(data: { plan_id: string }) {
+    return await this.request('/billing/change-plan/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Create payment intent for one-time payments with enhanced options
+  async createPaymentIntent(data: { 
+    amount: number; 
+    description?: string; 
+    invoice_id?: string;
+  }) {
     return await this.request('/billing/create-payment-intent/', {
       method: 'POST',
       body: JSON.stringify(data),

@@ -1,4 +1,4 @@
-# server/api/urls.py - Updated with missing endpoints
+# server/api/urls.py - Updated with plan management endpoints
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -37,10 +37,12 @@ except ImportError:
     update_profile = auth_not_available
     change_password = auth_not_available
 
+# Import enhanced billing views
 from .views.billing_views import (
     get_current_subscription, create_subscription, cancel_subscription,
     create_payment_intent, get_payment_methods, create_setup_intent,
-    stripe_webhook, get_admin_billing_settings, delete_admin_account
+    stripe_webhook, get_admin_billing_settings, delete_admin_account,
+    change_subscription_plan  # NEW: Import the new plan change function
 )
 
 # Import message views
@@ -126,10 +128,11 @@ urlpatterns = [
     # Real-time metrics endpoints
     path('metrics/realtime/', get_realtime_metrics, name='realtime_metrics'),
     
-    # Billing endpoints
+    # Enhanced Billing endpoints
     path('billing/subscription/', get_current_subscription, name='current_subscription'),
     path('billing/create-subscription/', create_subscription, name='create_subscription'),
     path('billing/cancel-subscription/', cancel_subscription, name='cancel_subscription'),
+    path('billing/change-plan/', change_subscription_plan, name='change_subscription_plan'),  # NEW: Plan change endpoint
     path('billing/create-payment-intent/', create_payment_intent, name='create_payment_intent'),
     path('billing/payment-methods/', get_payment_methods, name='payment_methods'),
     path('billing/create-setup-intent/', create_setup_intent, name='create_setup_intent'),

@@ -1,7 +1,6 @@
-// Replace the entire StripeElements.tsx file with this fixed version
-
+// client/src/components/StripeElements.tsx - Enhanced Professional Version
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Lock } from 'lucide-react';
+import { CreditCard, Lock, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface StripeElementsProps {
   clientSecret: string;
@@ -9,6 +8,8 @@ interface StripeElementsProps {
   onError: (error: string) => void;
   amount: number;
   description: string;
+  isSubscription?: boolean;
+  planName?: string;
 }
 
 export const StripeElements: React.FC<StripeElementsProps> = ({
@@ -16,39 +17,75 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
   onSuccess,
   onError,
   amount,
-  description
+  description,
+  isSubscription = false,
+  planName
 }) => {
   const [stripe, setStripe] = useState<any>(null);
   const [elements, setElements] = useState<any>(null);
   const [card, setCard] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cardComplete, setCardComplete] = useState(false);
+  const [cardBrand, setCardBrand] = useState<string>('');
 
   useEffect(() => {
-    // Initialize Stripe
     if (window.Stripe) {
       const stripeInstance = window.Stripe(
-        (import.meta as any).env?.VITE_STRIPE_PUBLISHABLE_KEY || (window as any).REACT_APP_STRIPE_PUBLISHABLE_KEY
+        import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
       );
       setStripe(stripeInstance);
 
-      const elementsInstance = stripeInstance.elements();
+      const elementsInstance = stripeInstance.elements({
+        appearance: {
+          theme: 'stripe',
+          variables: {
+            colorPrimary: '#7c3aed',
+            colorBackground: '#ffffff',
+            colorText: '#1f2937',
+            colorDanger: '#dc2626',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            spacingUnit: '4px',
+            borderRadius: '8px',
+          },
+          rules: {
+            '.Input': {
+              padding: '12px',
+              border: '1px solid #d1d5db',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            },
+            '.Input:focus': {
+              border: '1px solid #7c3aed',
+              boxShadow: '0 0 0 3px rgba(124, 58, 237, 0.1)',
+              outline: 'none',
+            },
+            '.Label': {
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '6px',
+            }
+          }
+        }
+      });
       setElements(elementsInstance);
 
-      // Create card element
       const cardElement = elementsInstance.create('card', {
         style: {
           base: {
             fontSize: '16px',
-            color: '#424770',
+            color: '#1f2937',
+            fontFamily: 'Inter, system-ui, sans-serif',
             '::placeholder': {
-              color: '#aab7c4',
+              color: '#9ca3af',
             },
+            iconColor: '#6b7280',
           },
           invalid: {
-            color: '#9e2146',
+            color: '#dc2626',
+            iconColor: '#dc2626',
           },
         },
+        hidePostalCode: false,
       });
 
       cardElement.mount('#card-element');
@@ -56,6 +93,8 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
 
       cardElement.on('change', (event: any) => {
         setError(event.error ? event.error.message : null);
+        setCardComplete(event.complete);
+        setCardBrand(event.brand || '');
       });
     }
   }, []);
@@ -64,7 +103,12 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     event.preventDefault();
 
     if (!stripe || !elements || !card) {
-      onError('Stripe has not loaded yet. Please try again.');
+      onError('Payment system not ready. Please try again.');
+      return;
+    }
+
+    if (!cardComplete) {
+      setError('Please complete your card information.');
       return;
     }
 
@@ -72,12 +116,11 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     setError(null);
 
     try {
-      // FIXED: For subscriptions, use confirmCardPayment with payment_method_data
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: card,
           billing_details: {
-            name: 'Customer Name', // You can get this from user context if available
+            name: 'Customer Name',
           },
         }
       });
@@ -111,62 +154,143 @@ export const StripeElements: React.FC<StripeElementsProps> = ({
     }).format(amount);
   };
 
+  const getCardBrandIcon = () => {
+    switch (cardBrand) {
+      case 'visa':
+        return '💳';
+      case 'mastercard':
+        return '💳';
+      case 'amex':
+        return '💳';
+      case 'discover':
+        return '💳';
+      default:
+        return '💳';
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto">
-      <div className="bg-white p-6 rounded-lg shadow-lg">
-        <div className="text-center mb-6">
-          <CreditCard className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900">{description}</h3>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(amount)}</p>
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white">
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-white/20 p-3 rounded-full">
+              <CreditCard className="w-8 h-8" />
+            </div>
+          </div>
+          <h3 className="text-xl font-semibold text-center mb-2">
+            {isSubscription ? `Subscribe to ${planName}` : 'Complete Payment'}
+          </h3>
+          <div className="text-center">
+            <span className="text-3xl font-bold">{formatCurrency(amount)}</span>
+            {isSubscription && <span className="text-purple-100 ml-2">/month</span>}
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Card Information
-            </label>
-            <div 
-              id="card-element" 
-              className="p-3 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-purple-500"
-            />
-          </div>
+        {/* Payment Form */}
+        <div className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Card Information
+              </label>
+              <div className="relative">
+                <div 
+                  id="card-element" 
+                  className={`p-4 border-2 rounded-lg transition-colors ${
+                    error 
+                      ? 'border-red-300 bg-red-50' 
+                      : cardComplete 
+                        ? 'border-green-300 bg-green-50' 
+                        : 'border-gray-200 hover:border-gray-300 focus-within:border-purple-500'
+                  }`}
+                />
+                {cardComplete && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
+                {cardBrand && (
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-lg">
+                    {getCardBrandIcon()}
+                  </div>
+                )}
+              </div>
+            </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+            {error && (
+              <div className="flex items-start space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            {/* Security Notice */}
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+              <Lock className="w-5 h-5 text-gray-500" />
+              <div className="text-sm text-gray-600">
+                <p className="font-medium">Secure Payment</p>
+                <p>Your payment information is encrypted and secure</p>
+              </div>
+            </div>
+
+            {/* Payment Summary */}
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">{description}</span>
+                <span className="font-semibold">{formatCurrency(amount)}</span>
+              </div>
+              {isSubscription && (
+                <>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Billing cycle</span>
+                    <span className="text-gray-500">Monthly</span>
+                  </div>
+                  <div className="border-t border-gray-200 pt-2 mt-2">
+                    <div className="flex justify-between items-center font-semibold">
+                      <span>Due today</span>
+                      <span>{formatCurrency(amount)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={!stripe || processing || !cardComplete}
+              className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 ${
+                processing || !cardComplete
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transform hover:scale-[1.02] active:scale-[0.98]'
+              } focus:ring-4 focus:ring-purple-200 shadow-lg`}
+            >
+              {processing ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                `Pay ${formatCurrency(amount)}`
+              )}
+            </button>
+          </form>
+
+          {/* Test Card Info for Development */}
+          {import.meta.env.MODE === 'development' && (
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">Test Card Numbers</h4>
+              <div className="text-xs text-blue-700 space-y-1">
+                <p><strong>Success:</strong> 4242 4242 4242 4242</p>
+                <p><strong>Declined:</strong> 4000 0000 0000 0002</p>
+                <p><strong>Expiry:</strong> Any future date</p>
+                <p><strong>CVC:</strong> Any 3 digits</p>
+                <p><strong>ZIP:</strong> Any valid ZIP code</p>
+              </div>
             </div>
           )}
-
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center text-sm text-gray-600">
-              <Lock className="w-4 h-4 mr-2" />
-              <span>Your payment information is secure and encrypted</span>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={!stripe || processing}
-            className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-colors ${
-              processing 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-200'
-            }`}
-          >
-            {processing ? 'Processing...' : `Pay ${formatCurrency(amount)}`}
-          </button>
-        </form>
-
-        {/* Test Card Info for Development */}
-        {import.meta.env.MODE === 'development' && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-700">
-              <strong>Test Card:</strong> 4242 4242 4242 4242<br />
-              <strong>Expiry:</strong> Any future date<br />
-              <strong>CVC:</strong> Any 3 digits
-            </p>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
