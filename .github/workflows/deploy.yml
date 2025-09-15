@@ -1,0 +1,33 @@
+name: Auto Deploy to VPS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🚀 Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          echo "🔄 Starting deployment..."
+          cd /home/ubuntu/followers_tt
+          git pull origin main
+          
+          if [ -d "client" ]; then
+            echo "📦 Installing frontend dependencies..."
+            cd client
+            npm install
+            echo "🏗️ Building frontend..."
+            npm run build
+            cd ..
+          fi
+          
+          echo "🎉 Deployment completed!"
