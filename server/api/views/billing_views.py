@@ -1,4 +1,4 @@
-# server/api/views/billing_views.py - Enhanced version with proper subscription management
+# server/api/views/billing_views.py - Enhanced with better error handling and debugging
 import stripe
 import logging
 from decimal import Decimal
@@ -20,15 +20,19 @@ from ..serializers import InvoiceSerializer
 
 logger = logging.getLogger(__name__)
 
-# Configure Stripe
+# Configure Stripe with better error handling
 try:
-    stripe.api_key = settings.STRIPE_SECRET_KEY
-    if not stripe.api_key or stripe.api_key.startswith('sk_test_51234567890'):
-        logger.warning("⚠️ Stripe secret key appears to be a placeholder. Please update with real Stripe keys.")
-except AttributeError:
-    logger.error("❌ STRIPE_SECRET_KEY not found in settings. Please add it to your .env file.")
+    stripe.api_key = getattr(settings, 'STRIPE_SECRET_KEY', None)
+    if not stripe.api_key:
+        logger.error("❌ STRIPE_SECRET_KEY not found in settings")
+    elif stripe.api_key.startswith('sk_test_51234567890'):
+        logger.warning("⚠️ Stripe secret key appears to be a placeholder")
+    else:
+        logger.info("✅ Stripe configured successfully")
+except Exception as e:
+    logger.error(f"❌ Error configuring Stripe: {str(e)}")
 
-# Plan configurations - updated to match frontend
+# Plan configurations - updated to match frontend exactly
 PLAN_CONFIGS = {
     'starter': {
         'name': 'Starter',
@@ -134,78 +138,161 @@ def get_current_subscription(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_subscription(request):
-    """Create a new subscription with comprehensive error handling"""
+    """Create a new subscription with comprehensive error handling and debugging"""
     try:
         logger.info(f"🔄 Subscription creation request from user: {request.user.email}")
         logger.info(f"📝 Request data: {request.data}")
         
+        # Check Stripe configuration first
+        if not stripe.api_key:
+            logger.error("❌ Stripe not configured")
+            return Response({
+                'error': 'Payment processing not configured. Please contact support.',
+                'debug_info': 'Stripe API key missing'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         if request.user.role != 'client':
+            logger.error(f"❌ Non-client user {request.user.email} attempted subscription creation")
             return Response({'error': 'Only clients can create subscriptions'}, 
                           status=status.HTTP_403_FORBIDDEN)
         
         price_id = request.data.get('price_id')
         plan_name = request.data.get('plan_name')
         
+        logger.info(f"📋 Received price_id: {price_id}, plan_name: {plan_name}")
+        
         if not price_id or not plan_name:
-            return Response({'error': 'Price ID and plan name are required'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            logger.error("❌ Missing required fields")
+            return Response({
+                'error': 'Price ID and plan name are required',
+                'received': {'price_id': price_id, 'plan_name': plan_name}
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             client = request.user.client_profile
+            logger.info(f"✅ Found client: {client.name}")
         except Client.DoesNotExist:
+            logger.error(f"❌ No client profile for user {request.user.email}")
             return Response({'error': 'Client profile not found. Please contact support.'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
-        # Extract plan ID and validate
+        # Extract and validate plan ID
         plan_id = price_id.replace('price_', '').replace('_monthly', '')
+        logger.info(f"📋 Extracted plan_id: {plan_id}")
+        
         plan_config = PLAN_CONFIGS.get(plan_id)
-        
         if not plan_config:
-            return Response({'error': f'Invalid plan: {plan_id}'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"❌ Invalid plan_id: {plan_id}")
+            return Response({
+                'error': f'Invalid plan: {plan_id}',
+                'available_plans': list(PLAN_CONFIGS.keys())
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create or get Stripe customer
+        logger.info(f"✅ Plan config found: {plan_config}")
+        
+        # Check for existing subscription
+        if hasattr(client, 'stripe_subscription_id') and client.stripe_subscription_id:
+            try:
+                existing_sub = stripe.Subscription.retrieve(client.stripe_subscription_id)
+                if existing_sub.status in ['active', 'trialing']:
+                    logger.warning(f"⚠️ Client {client.name} already has active subscription")
+                    return Response({
+                        'error': 'You already have an active subscription',
+                        'current_status': existing_sub.status
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except stripe.error.StripeError:
+                # Subscription doesn't exist or is invalid, continue
+                pass
+        
         with transaction.atomic():
+            # Create or get Stripe customer
             if not hasattr(client, 'stripe_customer_id') or not client.stripe_customer_id:
-                customer = stripe.Customer.create(
-                    email=request.user.email,
-                    name=f"{request.user.first_name} {request.user.last_name}",
-                    metadata={
-                        'user_id': str(request.user.id),
-                        'client_id': str(client.id),
-                    }
-                )
-                client.stripe_customer_id = customer.id
-                client.save()
+                logger.info("🔄 Creating new Stripe customer")
+                try:
+                    customer = stripe.Customer.create(
+                        email=request.user.email,
+                        name=f"{request.user.first_name} {request.user.last_name}".strip() or client.name,
+                        metadata={
+                            'user_id': str(request.user.id),
+                            'client_id': str(client.id),
+                            'django_user': request.user.email
+                        }
+                    )
+                    logger.info(f"✅ Created Stripe customer: {customer.id}")
+                    client.stripe_customer_id = customer.id
+                    client.save()
+                except stripe.error.StripeError as e:
+                    logger.error(f"❌ Failed to create Stripe customer: {str(e)}")
+                    return Response({
+                        'error': 'Failed to create customer account',
+                        'stripe_error': str(e)
+                    }, status=status.HTTP_400_BAD_REQUEST)
             else:
-                customer = stripe.Customer.retrieve(client.stripe_customer_id)
+                try:
+                    customer = stripe.Customer.retrieve(client.stripe_customer_id)
+                    logger.info(f"✅ Retrieved existing Stripe customer: {customer.id}")
+                except stripe.error.StripeError as e:
+                    logger.error(f"❌ Failed to retrieve Stripe customer: {str(e)}")
+                    return Response({
+                        'error': 'Customer account error',
+                        'stripe_error': str(e)
+                    }, status=status.HTTP_400_BAD_REQUEST)
             
             # Create Stripe price
-            stripe_price = stripe.Price.create(
-                unit_amount=int(plan_config['price'] * 100),
-                currency='usd',
-                recurring={'interval': 'month'},
-                product_data={
-                    'name': f"Instagram Growth - {plan_config['name']} Plan",
-                    'description': f"Monthly subscription for {plan_config['name']} plan"
-                }
-            )
+            logger.info("🔄 Creating Stripe price")
+            try:
+                stripe_price = stripe.Price.create(
+                    unit_amount=int(plan_config['price'] * 100),  # Convert to cents
+                    currency='usd',
+                    recurring={'interval': 'month'},
+                    product_data={
+                        'name': f"Instagram Growth - {plan_config['name']} Plan",
+                        'description': f"Monthly subscription for {plan_config['name']} plan",
+                        'metadata': {
+                            'plan_id': plan_id,
+                            'plan_name': plan_config['name']
+                        }
+                    },
+                    metadata={
+                        'plan_id': plan_id,
+                        'plan_name': plan_config['name'],
+                        'client_id': str(client.id)
+                    }
+                )
+                logger.info(f"✅ Created Stripe price: {stripe_price.id}")
+            except stripe.error.StripeError as e:
+                logger.error(f"❌ Failed to create Stripe price: {str(e)}")
+                return Response({
+                    'error': 'Failed to create pricing',
+                    'stripe_error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Create subscription
-            subscription = stripe.Subscription.create(
-                customer=customer.id,
-                items=[{'price': stripe_price.id}],
-                payment_behavior='default_incomplete',
-                payment_settings={'save_default_payment_method': 'on_subscription'},
-                expand=['latest_invoice.payment_intent'],
-                metadata={
-                    'client_id': str(client.id),
-                    'plan_id': plan_id,
-                    'plan_name': plan_name,
-                }
-            )
+            logger.info("🔄 Creating Stripe subscription")
+            try:
+                subscription = stripe.Subscription.create(
+                    customer=customer.id,
+                    items=[{'price': stripe_price.id}],
+                    payment_behavior='default_incomplete',
+                    payment_settings={'save_default_payment_method': 'on_subscription'},
+                    expand=['latest_invoice.payment_intent'],
+                    metadata={
+                        'client_id': str(client.id),
+                        'plan_id': plan_id,
+                        'plan_name': plan_config['name'],
+                        'user_email': request.user.email
+                    }
+                )
+                logger.info(f"✅ Created Stripe subscription: {subscription.id}")
+            except stripe.error.StripeError as e:
+                logger.error(f"❌ Failed to create Stripe subscription: {str(e)}")
+                return Response({
+                    'error': 'Failed to create subscription',
+                    'stripe_error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             # Update client record
+            logger.info("🔄 Updating client record")
             client.stripe_subscription_id = subscription.id
             client.current_plan = plan_id
             client.package = plan_config['name']
@@ -213,33 +300,70 @@ def create_subscription(request):
             client.status = 'active'
             client.next_payment = timezone.now().date() + timedelta(days=30)
             client.save()
+            logger.info(f"✅ Updated client {client.name}")
         
-        # Get client secret
+        # Get client secret from payment intent
         client_secret = None
         if (subscription.latest_invoice and 
             hasattr(subscription.latest_invoice, 'payment_intent') and
             subscription.latest_invoice.payment_intent):
-            client_secret = subscription.latest_invoice.payment_intent.client_secret
+            
+            if hasattr(subscription.latest_invoice.payment_intent, 'client_secret'):
+                client_secret = subscription.latest_invoice.payment_intent.client_secret
+            else:
+                # payment_intent might be a string ID, retrieve it
+                try:
+                    payment_intent = stripe.PaymentIntent.retrieve(subscription.latest_invoice.payment_intent)
+                    client_secret = payment_intent.client_secret
+                except stripe.error.StripeError as e:
+                    logger.warning(f"⚠️ Could not retrieve payment intent: {str(e)}")
+        
+        if not client_secret:
+            logger.warning("⚠️ No client secret available")
         
         response_data = {
             'subscription_id': subscription.id,
             'client_secret': client_secret,
             'status': subscription.status,
             'plan_name': plan_config['name'],
-            'amount': plan_config['price']
+            'amount': plan_config['price'],
+            'customer_id': customer.id
         }
         
-        logger.info(f"✅ Subscription creation completed successfully: {response_data}")
+        logger.info(f"✅ Subscription creation completed successfully")
+        logger.info(f"📤 Response data: {response_data}")
+        
         return Response(response_data)
+        
+    except stripe.error.InvalidRequestError as e:
+        logger.error(f"❌ Stripe invalid request: {str(e)}")
+        return Response({
+            'error': 'Invalid payment request',
+            'details': str(e),
+            'type': 'stripe_invalid_request'
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except stripe.error.AuthenticationError as e:
+        logger.error(f"❌ Stripe authentication error: {str(e)}")
+        return Response({
+            'error': 'Payment processing authentication failed',
+            'type': 'stripe_auth_error'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
     except stripe.error.StripeError as e:
         logger.error(f"❌ Stripe error: {str(e)}")
-        return Response({'error': f'Payment processing error: {str(e)}'}, 
-                      status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'error': f'Payment processing error: {str(e)}',
+            'type': 'stripe_error'
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
     except Exception as e:
-        logger.error(f"💥 Unexpected error: {str(e)}")
-        return Response({'error': 'Internal server error. Please contact support.'}, 
-                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"💥 Unexpected error in create_subscription: {str(e)}")
+        logger.exception("Full traceback:")
+        return Response({
+            'error': 'Internal server error. Please contact support.',
+            'type': 'server_error'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -593,7 +717,7 @@ def create_setup_intent(request):
         return Response({'error': 'Internal server error'}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# Webhook handlers - Enhanced with better invoice integration
+# Webhook handlers
 def handle_successful_payment(payment_intent):
     """Handle successful one-time payment"""
     try:
@@ -682,8 +806,13 @@ def stripe_webhook(request):
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     
     try:
+        webhook_secret = getattr(settings, 'STRIPE_WEBHOOK_SECRET', None)
+        if not webhook_secret:
+            logger.error("No webhook secret configured")
+            return HttpResponse(status=400)
+            
         event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            payload, sig_header, webhook_secret
         )
     except ValueError:
         logger.error("Invalid payload in Stripe webhook")
@@ -777,9 +906,11 @@ def get_admin_billing_settings(request):
     
     pending_payments = Invoice.objects.filter(status='pending').count()
     
-    # Return current admin settings
+    # Check Stripe configuration
+    stripe_configured = bool(getattr(settings, 'STRIPE_SECRET_KEY', None))
+    
     return Response({
-        'stripe_account_connected': bool(getattr(settings, 'STRIPE_SECRET_KEY', None)),
+        'stripe_account_connected': stripe_configured,
         'total_revenue_this_month': float(total_revenue),
         'pending_payments': pending_payments,
     })
