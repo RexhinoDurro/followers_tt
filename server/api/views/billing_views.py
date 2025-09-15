@@ -246,24 +246,15 @@ def create_subscription(request):
                     currency='usd',
                     recurring={'interval': 'month'},
                     product_data={
-                        'name': f"Instagram Growth - {plan_config['name']} Plan",
-                        'description': f"Monthly subscription for {plan_config['name']} plan",
-                        'metadata': {
-                            'plan_id': plan_id,
-                            'plan_name': plan_config['name']
-                        }
-                    },
-                    metadata={
-                        'plan_id': plan_id,
-                        'plan_name': plan_config['name'],
-                        'client_id': str(client.id)
+                        'name': f"Instagram Growth - {plan_config['name']} Plan"
+                        # Note: removed 'description' field as it's not valid in product_data
                     }
                 )
                 logger.info(f"✅ Created Stripe price: {stripe_price.id}")
             except stripe.error.StripeError as e:
                 logger.error(f"❌ Failed to create Stripe price: {str(e)}")
                 return Response({
-                    'error': 'Failed to create pricing',
+                    'error': f'Failed to create pricing: {str(e)}',
                     'stripe_error': str(e)
                 }, status=status.HTTP_400_BAD_REQUEST)
             
