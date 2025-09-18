@@ -60,16 +60,7 @@ export const Header: React.FC = () => {
               Services
             </Link>
             
-            <Link 
-              to="/pricing" 
-              className={`px-3 py-2 text-sm font-medium transition-colors text-white hover:text-gray-200 ${
-                isActive('/pricing') 
-                  ? 'border-b-2 border-white' 
-                  : ''
-              }`}
-            >
-              Pricing
-            </Link>
+           
             
             <Link 
               to="/how-it-works" 
@@ -169,17 +160,6 @@ export const Header: React.FC = () => {
               Services
             </Link>
             
-            <Link 
-              to="/pricing" 
-              className={`block px-3 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
-                isActive('/pricing') 
-                  ? 'bg-white text-purple-800' 
-                  : 'text-white hover:bg-white hover:text-purple-800'
-              }`}
-              onClick={handleMobileMenuClose}
-            >
-              Pricing
-            </Link>
             
             <Link 
               to="/how-it-works" 
