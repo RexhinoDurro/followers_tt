@@ -13,7 +13,6 @@ import HomePage from './pages/HomePage';
 import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
 import HowItWorksPage from './pages/HowItWorksPage';
-import PricingPage from './pages/PricingPage';
 import CartPage from './pages/CartPage';
 import OrderConfirmation from './pages/OrderConfirmation';
 import InstagramGrowth from './pages/services/InstagramGrowth';
@@ -115,15 +114,6 @@ const AppContent: React.FC = () => {
           </div>
         } />
         
-        <Route path="/pricing" element={
-          <div className="min-h-screen bg-gray-50">
-            <Header />
-            <main>
-              <PricingPage />
-            </main>
-            <Footer />
-          </div>
-        } />
         
         <Route path="/how-it-works" element={
           <div className="min-h-screen bg-gray-50">
