@@ -1,4 +1,4 @@
-# server/api/urls.py - Updated with new billing endpoints
+# server/api/urls.py - Updated with PayPal billing endpoints
 from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -36,13 +36,13 @@ except ImportError:
     update_profile = auth_not_available
     change_password = auth_not_available
 
-# Import enhanced billing views - UPDATED with new endpoints
-from .views.billing_views import (
-    get_available_plans, get_current_subscription, create_subscription, 
-    change_subscription_plan, cancel_subscription, reactivate_subscription,
-    pay_invoice, get_payment_methods, create_setup_intent,
+# Import PayPal billing views - UPDATED for PayPal
+from .views.paypal_billing_views import (
+    get_available_plans, get_current_subscription, create_subscription,
+    approve_subscription, cancel_subscription, pay_invoice, 
+    capture_payment, get_payment_methods, create_setup_intent,
     set_default_payment_method, delete_payment_method,
-    stripe_webhook, get_admin_billing_settings, delete_admin_account
+    paypal_webhook, get_admin_billing_settings, delete_admin_account
 )
 
 # Import message views
@@ -125,26 +125,26 @@ urlpatterns = [
     # Real-time metrics endpoints
     path('metrics/realtime/', get_realtime_metrics, name='realtime_metrics'),
     
-    # ENHANCED BILLING ENDPOINTS
+    # PAYPAL BILLING ENDPOINTS - Updated for PayPal
     # Subscription management
     path('billing/plans/', get_available_plans, name='available_plans'),
     path('billing/subscription/', get_current_subscription, name='current_subscription'),
     path('billing/create-subscription/', create_subscription, name='create_subscription'),
-    path('billing/change-plan/', change_subscription_plan, name='change_subscription_plan'),
+    path('billing/approve-subscription/', approve_subscription, name='approve_subscription'),
     path('billing/cancel-subscription/', cancel_subscription, name='cancel_subscription'),
-    path('billing/reactivate-subscription/', reactivate_subscription, name='reactivate_subscription'),
     
     # Invoice payments
     path('billing/invoices/<uuid:invoice_id>/pay/', pay_invoice, name='pay_invoice'),
+    path('billing/capture-payment/', capture_payment, name='capture_payment'),
     
-    # Payment method management
+    # Payment method management (PayPal doesn't support saved payment methods)
     path('billing/payment-methods/', get_payment_methods, name='payment_methods'),
     path('billing/create-setup-intent/', create_setup_intent, name='create_setup_intent'),
     path('billing/payment-methods/<str:payment_method_id>/set-default/', set_default_payment_method, name='set_default_payment_method'),
     path('billing/payment-methods/<str:payment_method_id>/delete/', delete_payment_method, name='delete_payment_method'),
 
-    # Stripe webhook
-    path('billing/webhook/', stripe_webhook, name='stripe_webhook'),
+    # PayPal webhook
+    path('billing/webhook/', paypal_webhook, name='paypal_webhook'),
 
     # Admin billing and profile endpoints
     path('admin/billing-settings/', get_admin_billing_settings, name='admin_billing_settings'),

@@ -1,4 +1,4 @@
-# server/server/settings.py - Updated with social media API configuration
+# server/server/settings.py - Updated with PayPal configuration (replacing Stripe)
 from pathlib import Path
 import os
 from datetime import timedelta
@@ -73,18 +73,23 @@ DATABASES = {
     }
 }
 
+# ============ PAYPAL CONFIGURATION (replacing Stripe) ============
+# PayPal API Configuration
+PAYPAL_CLIENT_ID = config('PAYPAL_CLIENT_ID', default='')
+PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET', default='')
+PAYPAL_BASE_URL = config('PAYPAL_BASE_URL', default='https://api-m.sandbox.paypal.com')  # Use https://api-m.paypal.com for production
+PAYPAL_WEBHOOK_ID = config('PAYPAL_WEBHOOK_ID', default='')
 
-# Stripe Configuration
-STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
-STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
+# PayPal Plan IDs (these need to be created in PayPal Dashboard)
+PAYPAL_STARTER_PLAN_ID = config('PAYPAL_STARTER_PLAN_ID', default='')
+PAYPAL_PRO_PLAN_ID = config('PAYPAL_PRO_PLAN_ID', default='')
+PAYPAL_PREMIUM_PLAN_ID = config('PAYPAL_PREMIUM_PLAN_ID', default='')
 
-# Stripe Price IDs for different packages
-STRIPE_PRICES = {
-    'starter': config('STRIPE_PRICE_STARTER', default=''),  # $1,500/month
-    'growth': config('STRIPE_PRICE_GROWTH', default=''),   # $3,000/month
-    'professional': config('STRIPE_PRICE_PROFESSIONAL', default=''),  # $5,000/month
-    'enterprise': config('STRIPE_PRICE_ENTERPRISE', default=''),  # Custom pricing
+# PayPal package pricing (for reference)
+PAYPAL_PACKAGES = {
+    'starter': 100,    # $100/month
+    'pro': 250,       # $250/month
+    'premium': 400,   # $400/month
 }
 
 # For production, use PostgreSQL:
@@ -186,10 +191,11 @@ CORS_ALLOW_HEADERS = [
 # Frontend URL for OAuth redirects
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
-# Social Media API Configuration
+# ============ SOCIAL MEDIA API CONFIGURATION ============
 # Instagram/Facebook API
 INSTAGRAM_CLIENT_ID = config('INSTAGRAM_CLIENT_ID', default='')
 INSTAGRAM_CLIENT_SECRET = config('INSTAGRAM_CLIENT_SECRET', default='')
+INSTAGRAM_REDIRECT_URI = config('INSTAGRAM_REDIRECT_URI', default=f"{FRONTEND_URL}/auth/instagram/callback")
 FACEBOOK_APP_ID = config('FACEBOOK_APP_ID', default='')
 FACEBOOK_APP_SECRET = config('FACEBOOK_APP_SECRET', default='')
 
@@ -197,11 +203,6 @@ FACEBOOK_APP_SECRET = config('FACEBOOK_APP_SECRET', default='')
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
 YOUTUBE_REDIRECT_URI = config('YOUTUBE_REDIRECT_URI', default=f"{FRONTEND_URL}/auth/youtube/callback")
-
-# Stripe
-STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
-STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')
 
 # TikTok API (when available)
 TIKTOK_CLIENT_KEY = config('TIKTOK_CLIENT_KEY', default='')
@@ -216,10 +217,10 @@ TWITTER_BEARER_TOKEN = config('TWITTER_BEARER_TOKEN', default='')
 LINKEDIN_CLIENT_ID = config('LINKEDIN_CLIENT_ID', default='')
 LINKEDIN_CLIENT_SECRET = config('LINKEDIN_CLIENT_SECRET', default='')
 
-# Encryption key for storing access tokens
+# Encryption key for storing access tokens (32 characters)
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='your-32-character-encryption-key-here')
 
-# Celery Configuration
+# ============ CELERY CONFIGURATION ============
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
@@ -324,6 +325,12 @@ LOGGING = {
             'filename': BASE_DIR / 'logs' / 'celery.log',
             'formatter': 'verbose',
         },
+        'paypal': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'paypal.log',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'django': {
@@ -340,6 +347,11 @@ LOGGING = {
             'handlers': ['celery', 'console'],
             'level': 'INFO',
             'propagate': True,
+        },
+        'api.payments.paypal_service': {
+            'handlers': ['paypal', 'console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
         },
     },
 }
@@ -386,6 +398,10 @@ API_RATE_LIMITS = {
     },
     'tiktok': {
         'calls_per_day': 1000,
+    },
+    'paypal': {
+        'calls_per_minute': 50,
+        'calls_per_hour': 1000,
     }
 }
 
@@ -394,9 +410,10 @@ DATA_RETENTION_DAYS = {
     'metrics': 365,  # Keep metrics for 1 year
     'post_metrics': 180,  # Keep post metrics for 6 months
     'sync_logs': 90,  # Keep sync logs for 3 months
+    'payment_logs': 2555,  # Keep payment logs for 7 years (compliance)
 }
 
-# Webhook settings for real-time updates (if supported by platforms)
+# Webhook settings for real-time updates
 WEBHOOK_SECRET = config('WEBHOOK_SECRET', default='your-webhook-secret-key')
 WEBHOOK_VERIFY_TOKEN = config('WEBHOOK_VERIFY_TOKEN', default='your-verify-token')
 
@@ -407,6 +424,67 @@ FEATURES = {
     'ENABLE_TIKTOK': False,  # Enable when TikTok API is available
     'ENABLE_TWITTER': False,
     'ENABLE_LINKEDIN': False,
-    'ENABLE_WEBHOOKS': False,
+    'ENABLE_WEBHOOKS': True,
     'ENABLE_REAL_TIME_UPDATES': True,
+    'ENABLE_PAYPAL_PAYMENTS': True,
 }
+
+# ============ PAYPAL VALIDATION ============
+def validate_paypal_config():
+    """Validate PayPal configuration on startup"""
+    required_settings = [
+        'PAYPAL_CLIENT_ID',
+        'PAYPAL_CLIENT_SECRET',
+        'PAYPAL_BASE_URL',
+    ]
+    
+    missing_settings = []
+    for setting in required_settings:
+        if not globals().get(setting):
+            missing_settings.append(setting)
+    
+    if missing_settings and not DEBUG:
+        print(f"⚠️  Missing PayPal configuration: {', '.join(missing_settings)}")
+        print("   PayPal payments will not work until these are configured.")
+    elif not missing_settings:
+        env_type = "Sandbox" if "sandbox" in PAYPAL_BASE_URL else "Live"
+        print(f"✅ PayPal configuration validated ({env_type} environment)")
+
+# Validate configuration on startup (only in production)
+if not DEBUG:
+    validate_paypal_config()
+
+# ============ DEVELOPMENT OVERRIDES ============
+if DEBUG:
+    # Development-specific settings
+    CORS_ALLOW_ALL_ORIGINS = True
+    
+    # Console logging only in development
+    LOGGING['handlers']['console']['level'] = 'DEBUG'
+    
+    # Disable CSRF for development API testing
+    CSRF_TRUSTED_ORIGINS = [FRONTEND_URL]
+    
+    # PayPal debug mode
+    print("🔧 Development mode: Using PayPal Sandbox")
+    if PAYPAL_CLIENT_ID and "sandbox" not in PAYPAL_BASE_URL:
+        print("⚠️  Warning: PayPal Client ID suggests sandbox but BASE_URL is not sandbox")
+
+# Production overrides
+else:
+    # Add production domain to CORS and CSRF settings
+    PRODUCTION_DOMAIN = config('PRODUCTION_DOMAIN', default='https://visionboost.agency')
+    
+    CORS_ALLOWED_ORIGINS.extend([
+        PRODUCTION_DOMAIN,
+        f"{PRODUCTION_DOMAIN.replace('https://', 'https://www.')}"
+    ])
+    
+    CSRF_TRUSTED_ORIGINS.extend([
+        PRODUCTION_DOMAIN,
+        f"{PRODUCTION_DOMAIN.replace('https://', 'https://www.')}"
+    ])
+    
+    # Ensure PayPal is in live mode for production
+    if "sandbox" in PAYPAL_BASE_URL:
+        print("⚠️  Warning: Using PayPal Sandbox in production mode")

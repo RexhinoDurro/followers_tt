@@ -1,7 +1,7 @@
-// client/src/components/SubscriptionPayment.tsx - Enhanced with professional design
+// client/src/components/SubscriptionPayment.tsx - Enhanced with PayPal integration
 import React, { useState } from 'react';
 import { ArrowLeft, Lock, CheckCircle, AlertCircle, CreditCard, Shield } from 'lucide-react';
-import { StripeElements } from './StripeElements';
+import { PayPalElements } from './PayPalElements';
 import ApiService from '../services/ApiService';
 
 interface Plan {
@@ -9,7 +9,7 @@ interface Plan {
   name: string;
   price: number;
   features: string[];
-  stripePrice: string;
+  stripePrice: string; // Keep for backward compatibility, but won't be used
 }
 
 interface SubscriptionPaymentProps {
@@ -17,12 +17,20 @@ interface SubscriptionPaymentProps {
   onCancel: () => void;
 }
 
+interface SubscriptionResponse {
+  subscription_id: string;
+  approval_url: string;
+  status: string;
+  plan_name: string;
+  amount: number;
+}
+
 export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
   plan,
   onCancel
 }) => {
   const [step, setStep] = useState<'details' | 'payment' | 'success'>('details');
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,21 +39,20 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
       setLoading(true);
       setError(null);
       
-      console.log('Creating subscription for plan:', plan);
+      console.log('Creating PayPal subscription for plan:', plan);
       
       const data = await ApiService.createSubscription({
-        price_id: plan.stripePrice,
+        price_id: `price_${plan.id}_monthly`, // Keep format for backend compatibility
         plan_name: plan.name
-      }) as { client_secret: string; subscription_id: string };
+      }) as SubscriptionResponse;
 
-      console.log('Subscription created:', data);
+      console.log('PayPal subscription created:', data);
       
-      if (!data.client_secret) {
-        throw new Error('No client secret received from server');
+      if (!data.approval_url) {
+        throw new Error('No approval URL received from PayPal');
       }
 
-      setClientSecret(data.client_secret);
-      setClientSecret(data.client_secret);
+      setSubscriptionData(data);
       setStep('payment');
     } catch (err) {
       console.error('Subscription creation failed:', err);
@@ -96,11 +103,11 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-6 text-white">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white">
         <div className="flex items-center justify-between">
           <button
             onClick={onCancel}
-            className="flex items-center text-white hover:text-purple-200 transition-colors"
+            className="flex items-center text-white hover:text-blue-200 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back
@@ -117,8 +124,8 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
             {/* Plan Summary */}
             <div className="bg-white rounded-xl p-6 shadow-sm border">
               <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
-                  <CreditCard className="w-8 h-8 text-purple-600" />
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                  <CreditCard className="w-8 h-8 text-blue-600" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name} Plan</h3>
                 <div className="flex items-baseline justify-center mb-4">
@@ -147,11 +154,11 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
               <div className="space-y-3 text-sm text-gray-600">
                 <div className="flex items-center">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                  <span>256-bit SSL encryption</span>
+                  <span>PayPal secure payment processing</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                  <span>PCI DSS compliant</span>
+                  <span>256-bit SSL encryption</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
@@ -175,6 +182,10 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
                 <div className="flex justify-between">
                   <span>Billing cycle:</span>
                   <span className="font-medium">Monthly</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment method:</span>
+                  <span className="font-medium">PayPal</span>
                 </div>
                 <div className="flex justify-between">
                   <span>First payment:</span>
@@ -210,6 +221,17 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
                 </div>
               )}
 
+              {/* PayPal Information */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">PayPal Payment</h4>
+                <div className="text-sm text-blue-700 space-y-1">
+                  <p>✓ Secure payment processing through PayPal</p>
+                  <p>✓ Pay with your PayPal account or credit/debit card</p>
+                  <p>✓ No payment information stored on our servers</p>
+                  <p>✓ Automatic monthly billing through PayPal</p>
+                </div>
+              </div>
+
               {/* Terms and Agreement */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-2">Terms & Agreement</h4>
@@ -228,7 +250,7 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
                   className={`px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
                     loading 
                       ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl'
                   }`}
                 >
                   {loading ? (
@@ -237,22 +259,22 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
                       Setting up...
                     </div>
                   ) : (
-                    'Continue to Payment'
+                    'Continue to PayPal'
                   )}
                 </button>
               </div>
             </div>
           )}
 
-          {step === 'payment' && clientSecret && (
+          {step === 'payment' && subscriptionData && (
             <div className="space-y-6">
               <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Enter Payment Details</h3>
-                <p className="text-gray-600">Secure payment powered by Stripe</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Complete Payment with PayPal</h3>
+                <p className="text-gray-600">Secure payment powered by PayPal</p>
               </div>
 
-              <StripeElements
-                clientSecret={clientSecret}
+              <PayPalElements
+                subscriptionData={subscriptionData}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
                 amount={plan.price}
@@ -284,7 +306,7 @@ export const SubscriptionPayment: React.FC<SubscriptionPaymentProps> = ({
           </div>
           <div className="flex items-center">
             <Shield className="w-4 h-4 mr-2" />
-            <span>SSL Encrypted</span>
+            <span>PayPal Protected</span>
           </div>
           <div className="flex items-center">
             <CheckCircle className="w-4 h-4 mr-2" />

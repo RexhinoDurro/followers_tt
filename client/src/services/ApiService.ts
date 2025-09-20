@@ -1,4 +1,4 @@
-// client/src/services/ApiService.ts - Enhanced with complete billing functionality
+// client/src/services/ApiService.ts - Updated for PayPal integration
 class ApiService {
   private baseURL: string;
   private token: string | null;
@@ -410,7 +410,7 @@ class ApiService {
     return await this.request('/health/');
   }
 
-  // ============ ENHANCED STRIPE/BILLING METHODS ============
+  // ============ PAYPAL BILLING METHODS (replacing Stripe methods) ============
   
   // Get available subscription plans
   async getAvailablePlans() {
@@ -422,7 +422,7 @@ class ApiService {
     return await this.request('/billing/subscription/');
   }
 
-  // Create subscription
+  // Create PayPal subscription
   async createSubscription(data: { price_id: string; plan_name: string }) {
     return await this.request('/billing/create-subscription/', {
       method: 'POST',
@@ -430,71 +430,57 @@ class ApiService {
     });
   }
 
-  // Cancel subscription with options
-  async cancelSubscription(data?: { 
-    cancel_immediately?: boolean; 
-    reason?: string;
-  }) {
+  // Approve PayPal subscription after user approval
+  async approveSubscription(data: { subscription_id: string }) {
+    return await this.request('/billing/approve-subscription/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Cancel subscription
+  async cancelSubscription(data?: { reason?: string }) {
     return await this.request('/billing/cancel-subscription/', {
       method: 'POST',
       body: JSON.stringify(data || {}),
     });
   }
 
-  // Change subscription plan with proration
-  async changeSubscriptionPlan(data: { plan_id: string }) {
-    return await this.request('/billing/change-plan/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  // Reactivate cancelled subscription
-  async reactivateSubscription() {
-    return await this.request('/billing/reactivate-subscription/', {
-      method: 'POST',
-    });
-  }
-
-  // Pay specific invoice
+  // Pay specific invoice with PayPal
   async payInvoice(invoiceId: string) {
     return await this.request(`/billing/invoices/${invoiceId}/pay/`, {
       method: 'POST',
     });
   }
 
-  // Create payment intent for one-time payments
-  async createPaymentIntent(data: { 
-    amount: number; 
-    description?: string; 
-    invoice_id?: string;
-  }) {
-    return await this.request('/billing/create-payment-intent/', {
+  // Capture PayPal payment after approval
+  async capturePayment(data: { order_id: string }) {
+    return await this.request('/billing/capture-payment/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  // Get saved payment methods
+  // Get saved payment methods (PayPal doesn't support this)
   async getPaymentMethods() {
     return await this.request('/billing/payment-methods/');
   }
 
-  // Create setup intent for saving payment methods
+  // Create setup intent for saving payment methods (PayPal doesn't support this)
   async createSetupIntent() {
     return await this.request('/billing/create-setup-intent/', {
       method: 'POST',
     });
   }
 
-  // Set default payment method
+  // Set default payment method (PayPal doesn't support this)
   async setDefaultPaymentMethod(paymentMethodId: string) {
     return await this.request(`/billing/payment-methods/${paymentMethodId}/set-default/`, {
       method: 'POST',
     });
   }
 
-  // Delete payment method
+  // Delete payment method (PayPal doesn't support this)
   async deletePaymentMethod(paymentMethodId: string) {
     return await this.request(`/billing/payment-methods/${paymentMethodId}/delete/`, {
       method: 'DELETE',

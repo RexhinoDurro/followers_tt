@@ -115,7 +115,7 @@ class PostMetrics(models.Model):
         ordering = ['-posted_at']
 
 class Client(models.Model):
-    """Enhanced Client model with Stripe integration"""
+    """Enhanced Client model with PayPal integration"""
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('pending', 'Pending'),
@@ -146,9 +146,9 @@ class Client(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     
-    # NEW STRIPE FIELDS
-    stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
-    stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
+    # PAYPAL FIELDS (replacing Stripe fields)
+    paypal_customer_id = models.CharField(max_length=255, blank=True, null=True)  # PayPal payer ID
+    paypal_subscription_id = models.CharField(max_length=255, blank=True, null=True)
     current_plan = models.CharField(max_length=50, blank=True, null=True, choices=[
         ('starter', 'Starter'),
         ('pro', 'Pro'),
@@ -184,8 +184,8 @@ class Client(models.Model):
 
     @property
     def has_active_subscription(self):
-        """Check if client has an active Stripe subscription"""
-        return bool(self.stripe_subscription_id and self.status == 'active')
+        """Check if client has an active PayPal subscription"""
+        return bool(self.paypal_subscription_id and self.status == 'active')
 
     class Meta:
         ordering = ['-created_at']
