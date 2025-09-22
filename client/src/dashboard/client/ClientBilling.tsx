@@ -122,16 +122,23 @@ const ClientBilling: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      console.log('Fetching billing data...');
+      
       const [invoicesData, subscriptionData, plansData] = await Promise.all([
         ApiService.getInvoices() as Promise<Invoice[]>,
         ApiService.getCurrentSubscription() as Promise<CurrentSubscription | null>,
         ApiService.getAvailablePlans() as Promise<PlansResponse>,
       ]);
 
+      console.log('API responses:', { invoicesData, subscriptionData, plansData });
+
       const invoicesArray = Array.isArray(invoicesData) ? invoicesData : [];
       setInvoices(invoicesArray);
       setCurrentSubscription(subscriptionData);
-      setAvailablePlans(plansData?.plans || []);
+      
+      const plansArray = plansData?.plans || [];
+      console.log('Plans array:', plansArray);
+      setAvailablePlans(plansArray);
       
       // Calculate billing stats
       const totalSpent = invoicesArray
@@ -150,12 +157,17 @@ const ClientBilling: React.FC = () => {
       });
 
       // Show plan selection if no subscription
-      if (!subscriptionData && availablePlans.length > 0) {
+      if (!subscriptionData && plansArray.length > 0) {
+        console.log('No subscription found, showing plan selection');
         setCurrentStep('plan-selection');
       }
     } catch (error) {
       console.error('Failed to fetch billing data:', error);
       setError('Failed to load billing data. Please try again.');
+      
+      // Set empty arrays to prevent map errors
+      setAvailablePlans([]);
+      setInvoices([]);
     } finally {
       setLoading(false);
     }
@@ -292,7 +304,7 @@ const ClientBilling: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {availablePlans.map((plan) => (
+        {Array.isArray(availablePlans) && availablePlans.map((plan) => (
           <div
             key={plan.id}
             className={`relative cursor-pointer transition-all duration-200 hover:shadow-lg ${
@@ -336,6 +348,12 @@ const ClientBilling: React.FC = () => {
             </Card>
           </div>
         ))}
+        
+        {(!availablePlans || availablePlans.length === 0) && (
+          <div className="col-span-full text-center py-8">
+            <p className="text-gray-600">No plans available at the moment. Please try again later.</p>
+          </div>
+        )}
       </div>
     </div>
   );

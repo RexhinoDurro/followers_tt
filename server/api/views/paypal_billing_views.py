@@ -521,20 +521,18 @@ def get_current_subscription(request):
         # If no PayPal subscription, return basic info
         if not client.paypal_subscription_id:
             return Response({
-                'subscription': {
-                    'id': None,
-                    'status': 'none',
-                    'plan': client.current_plan,
-                    'start_date': client.subscription_start_date,
-                    'end_date': client.subscription_end_date,
-                    'trial_end_date': client.trial_end_date,
-                    'next_payment_date': client.next_payment,
-                    'amount': float(client.monthly_fee) if client.monthly_fee else 0,
-                    'currency': 'USD',
-                    'payment_method': 'paypal',
-                    'auto_renewal': False
-                },
-                'plan_details': PAYPAL_PLANS.get(client.current_plan, {}) if client.current_plan else None
+                'plan': client.current_plan or 'none',
+                'planId': client.current_plan or 'none',
+                'price': float(client.monthly_fee) if client.monthly_fee else 0,
+                'billing_cycle': 'monthly',
+                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
+                'features': PAYPAL_PLANS.get(client.current_plan, {}).get('features', []) if client.current_plan else [],
+                'status': 'none' if not client.current_plan else 'inactive',
+                'subscriptionId': None,
+                'can_cancel': False,
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': False
             })
         
         # Fetch current subscription details from PayPal
@@ -568,13 +566,16 @@ def get_current_subscription(request):
                 client.save()
             
             subscription_data = {
-                'id': subscription.get('id'),
-                'status': subscription.get('status', '').lower(),
                 'plan': current_plan or client.current_plan,
-                'start_date': subscription.get('start_time'),
-                'next_payment_date': next_billing_time,
-                'amount': float(last_payment.get('amount', {}).get('value', 0)) if last_payment else 0,
-                'currency': last_payment.get('amount', {}).get('currency_code', 'USD') if last_payment else 'USD',
+                'planId': current_plan or client.current_plan,
+                'price': float(last_payment.get('amount', {}).get('value', 0)) if last_payment else plan_details.get('price', 0),
+                'billing_cycle': 'monthly',
+                'next_billing_date': next_billing_time,
+                'features': plan_details.get('features', []) if plan_details else [],
+                'status': 'active' if subscription.get('status') == 'ACTIVE' else subscription.get('status', '').lower(),
+                'subscriptionId': subscription.get('id'),
+                'can_cancel': subscription.get('status') == 'ACTIVE',
+                'cancel_at_period_end': False,
                 'payment_method': 'paypal',
                 'auto_renewal': subscription.get('status') == 'ACTIVE',
                 'subscriber_info': {
@@ -589,40 +590,25 @@ def get_current_subscription(request):
                 }
             }
             
-            return Response({
-                'subscription': subscription_data,
-                'plan_details': plan_details,
-                'available_plans': [
-                    {
-                        'id': plan_id,
-                        'name': plan_data['name'],
-                        'price': plan_data['price'],
-                        'features': plan_data['features'],
-                        'is_current': plan_id == current_plan
-                    }
-                    for plan_id, plan_data in PAYPAL_PLANS.items()
-                ]
-            })
+            return Response(subscription_data)
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to fetch subscription from PayPal: {e}")
             # Return local data if PayPal API fails
             return Response({
-                'subscription': {
-                    'id': client.paypal_subscription_id,
-                    'status': 'unknown',
-                    'plan': client.current_plan,
-                    'start_date': client.subscription_start_date,
-                    'end_date': client.subscription_end_date,
-                    'trial_end_date': client.trial_end_date,
-                    'next_payment_date': client.next_payment,
-                    'amount': float(client.monthly_fee) if client.monthly_fee else 0,
-                    'currency': 'USD',
-                    'payment_method': 'paypal',
-                    'auto_renewal': False,
-                    'error': 'Could not fetch latest status from PayPal'
-                },
-                'plan_details': PAYPAL_PLANS.get(client.current_plan, {}) if client.current_plan else None
+                'plan': client.current_plan or 'none',
+                'planId': client.current_plan or 'none',
+                'price': float(client.monthly_fee) if client.monthly_fee else 0,
+                'billing_cycle': 'monthly',
+                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
+                'features': PAYPAL_PLANS.get(client.current_plan, {}).get('features', []) if client.current_plan else [],
+                'status': 'unknown',
+                'subscriptionId': client.paypal_subscription_id,
+                'can_cancel': True,
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': False,
+                'error': 'Could not fetch latest status from PayPal'
             })
             
     except Exception as e:
