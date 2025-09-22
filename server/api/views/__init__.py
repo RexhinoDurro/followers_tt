@@ -12,6 +12,26 @@ from .views import (
     health_check
 )
 
+from .paypal_billing_views import (
+    get_available_plans,
+    create_subscription,
+    approve_subscription,
+    create_order,
+    capture_payment,
+    paypal_webhook,
+    get_current_subscription,
+)
+
+__all__ = [
+    'get_available_plans',
+    'create_subscription', 
+    'approve_subscription',
+    'create_order',
+    'capture_payment',
+    'paypal_webhook',
+    'get_current_subscription',
+]
+
 # Import message views if available
 try:
     from .message_views import (
