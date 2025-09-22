@@ -20,6 +20,16 @@ from .paypal_billing_views import (
     capture_payment,
     paypal_webhook,
     get_current_subscription,
+    cancel_subscription,
+    update_subscription_plan,
+    # Stub functions for frontend compatibility
+    pay_invoice_stub,
+    get_payment_methods_stub,
+    create_setup_intent_stub,
+    set_default_payment_method_stub,
+    delete_payment_method_stub,
+    get_admin_billing_settings_stub,
+    delete_admin_account_stub,
 )
 
 __all__ = [
@@ -30,6 +40,16 @@ __all__ = [
     'capture_payment',
     'paypal_webhook',
     'get_current_subscription',
+    'cancel_subscription',
+    'update_subscription_plan',
+    # Stub functions
+    'pay_invoice_stub',
+    'get_payment_methods_stub',
+    'create_setup_intent_stub',
+    'set_default_payment_method_stub',
+    'delete_payment_method_stub',
+    'get_admin_billing_settings_stub',
+    'delete_admin_account_stub',
 ]
 
 # Import message views if available

@@ -39,10 +39,12 @@ except ImportError:
 # Import PayPal billing views - UPDATED for PayPal
 from .views.paypal_billing_views import (
     get_available_plans, get_current_subscription, create_subscription,
-    approve_subscription, cancel_subscription, pay_invoice, 
-    capture_payment, get_payment_methods, create_setup_intent,
-    set_default_payment_method, delete_payment_method,
-    paypal_webhook, get_admin_billing_settings, delete_admin_account
+    approve_subscription, cancel_subscription, update_subscription_plan, 
+    capture_payment, create_order, paypal_webhook,
+    # Stub functions for compatibility
+    pay_invoice_stub, get_payment_methods_stub, create_setup_intent_stub,
+    set_default_payment_method_stub, delete_payment_method_stub,
+    get_admin_billing_settings_stub, delete_admin_account_stub
 )
 
 # Import message views
@@ -85,18 +87,6 @@ except ImportError:
     disconnect_account = oauth_not_available
     trigger_manual_sync = oauth_not_available
     get_sync_status = oauth_not_available
-
-from .views.auth_views import update_profile, change_password
-AUTH_VIEWS_AVAILABLE = True
-
-# Import PayPal billing views - UPDATED for PayPal
-from .views.paypal_billing_views import (
-    get_available_plans, get_current_subscription, create_subscription,
-    approve_subscription, cancel_subscription, pay_invoice, 
-    capture_payment, get_payment_methods, create_setup_intent,
-    set_default_payment_method, delete_payment_method,
-    paypal_webhook, get_admin_billing_settings, delete_admin_account
-)
 
 # Import message views
 try:
@@ -185,23 +175,27 @@ urlpatterns = [
     path('billing/create-subscription/', create_subscription, name='create_subscription'),
     path('billing/approve-subscription/', approve_subscription, name='approve_subscription'),
     path('billing/cancel-subscription/', cancel_subscription, name='cancel_subscription'),
+    path('billing/update-subscription-plan/', update_subscription_plan, name='update_subscription_plan'),
     
-    # Invoice payments
-    path('billing/invoices/<uuid:invoice_id>/pay/', pay_invoice, name='pay_invoice'),
+    # One-time payments
+    path('billing/create-order/', create_order, name='create_order'),
     path('billing/capture-payment/', capture_payment, name='capture_payment'),
     
-    # Payment method management (PayPal doesn't support saved payment methods)
-    path('billing/payment-methods/', get_payment_methods, name='payment_methods'),
-    path('billing/create-setup-intent/', create_setup_intent, name='create_setup_intent'),
-    path('billing/payment-methods/<str:payment_method_id>/set-default/', set_default_payment_method, name='set_default_payment_method'),
-    path('billing/payment-methods/<str:payment_method_id>/delete/', delete_payment_method, name='delete_payment_method'),
+    # Invoice payments (stub for compatibility)
+    path('billing/invoices/<uuid:invoice_id>/pay/', pay_invoice_stub, name='pay_invoice'),
+    
+    # Payment method management (stubs for PayPal compatibility)
+    path('billing/payment-methods/', get_payment_methods_stub, name='payment_methods'),
+    path('billing/create-setup-intent/', create_setup_intent_stub, name='create_setup_intent'),
+    path('billing/payment-methods/<str:payment_method_id>/set-default/', set_default_payment_method_stub, name='set_default_payment_method'),
+    path('billing/payment-methods/<str:payment_method_id>/delete/', delete_payment_method_stub, name='delete_payment_method'),
 
     # PayPal webhook
     path('billing/webhook/', paypal_webhook, name='paypal_webhook'),
-
+    
     # Admin billing and profile endpoints
-    path('admin/billing-settings/', get_admin_billing_settings, name='admin_billing_settings'),
-    path('admin/delete-account/', delete_admin_account, name='delete_admin_account'),
+    path('admin/billing-settings/', get_admin_billing_settings_stub, name='admin_billing_settings'),
+    path('admin/delete-account/', delete_admin_account_stub, name='delete_admin_account'),
     
     # Analytics and reporting
     path('analytics/overview/', analytics_overview, name='analytics_overview'),
