@@ -86,6 +86,59 @@ except ImportError:
     trigger_manual_sync = oauth_not_available
     get_sync_status = oauth_not_available
 
+from .views.auth_views import update_profile, change_password
+AUTH_VIEWS_AVAILABLE = True
+
+# Import PayPal billing views - UPDATED for PayPal
+from .views.paypal_billing_views import (
+    get_available_plans, get_current_subscription, create_subscription,
+    approve_subscription, cancel_subscription, pay_invoice, 
+    capture_payment, get_payment_methods, create_setup_intent,
+    set_default_payment_method, delete_payment_method,
+    paypal_webhook, get_admin_billing_settings, delete_admin_account
+)
+
+# Import message views
+try:
+    from .views.message_views import (
+        send_message_to_admin, send_message_to_client,
+        get_admin_conversations, get_conversation_messages
+    )
+    MESSAGE_VIEWS_AVAILABLE = True
+except ImportError:
+    MESSAGE_VIEWS_AVAILABLE = False
+    def message_not_available(request, *args, **kwargs):
+        return JsonResponse({'error': 'Message functionality not available'}, status=501)
+    
+    send_message_to_admin = message_not_available
+    send_message_to_client = message_not_available
+    get_admin_conversations = message_not_available
+    get_conversation_messages = message_not_available
+
+# Import OAuth views with error handling
+try:
+    from .views.oauth_views import (
+        initiate_instagram_oauth, handle_instagram_callback,
+        initiate_youtube_oauth, handle_youtube_callback,
+        get_connected_accounts, disconnect_account,
+        trigger_manual_sync, get_sync_status
+    )
+    OAUTH_ENABLED = True
+except ImportError:
+    OAUTH_ENABLED = False
+    
+    def oauth_not_available(request, *args, **kwargs):
+        return JsonResponse({'error': 'OAuth functionality not available'}, status=501)
+    
+    initiate_instagram_oauth = oauth_not_available
+    handle_instagram_callback = oauth_not_available
+    initiate_youtube_oauth = oauth_not_available
+    handle_youtube_callback = oauth_not_available
+    get_connected_accounts = oauth_not_available
+    disconnect_account = oauth_not_available
+    trigger_manual_sync = oauth_not_available
+    get_sync_status = oauth_not_available
+
 # Create router and register viewsets
 router = DefaultRouter()
 router.register(r'clients', ClientViewSet, basename='client')
