@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Deploy script for VisionBoost Agency
-# This script builds the client and deploys to production
+# This script builds the client and deploys to productions
 
 set -e  # Exit on any error
 
