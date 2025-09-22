@@ -767,7 +767,7 @@ const AdminTasks: React.FC = () => {
           <Input
             label="Task Title"
             value={showEditTask && selectedTask ? selectedTask.title : newTask.title}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               if (showEditTask && selectedTask) {
                 setSelectedTask({ ...selectedTask, title: e.target.value });
               } else {
@@ -781,7 +781,7 @@ const AdminTasks: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
             <textarea
               value={showEditTask && selectedTask ? selectedTask.description : newTask.description}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                 if (showEditTask && selectedTask) {
                   setSelectedTask({ ...selectedTask, description: e.target.value });
                 } else {

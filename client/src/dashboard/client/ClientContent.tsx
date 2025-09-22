@@ -423,7 +423,7 @@ const ClientContent: React.FC = () => {
               label="Schedule Date"
               type="datetime-local"
               value={newContent.scheduled_date}
-              onChange={(e) => setNewContent({ ...newContent, scheduled_date: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContent({ ...newContent, scheduled_date: e.target.value })}
               required
             />
             
@@ -431,7 +431,7 @@ const ClientContent: React.FC = () => {
               label="Image URL (optional)"
               type="url"
               value={newContent.image_url}
-              onChange={(e) => setNewContent({ ...newContent, image_url: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContent({ ...newContent, image_url: e.target.value })}
               placeholder="https://example.com/image.jpg"
             />
           </div>

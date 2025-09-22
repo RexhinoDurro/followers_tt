@@ -88,7 +88,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                 label="Full Name"
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                 required
                 placeholder="Enter your full name"
                 disabled={loading}
@@ -98,7 +98,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                 label="Company Name (Optional)"
                 type="text"
                 value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, company: e.target.value })}
                 placeholder="Your company name"
                 disabled={loading}
               />
@@ -124,7 +124,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
             label="Email Address"
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
             required
             placeholder="Enter your email"
             disabled={loading}
@@ -135,7 +135,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               label="Password"
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
               required
               placeholder="Enter your password"
               disabled={loading}

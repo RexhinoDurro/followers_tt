@@ -398,14 +398,14 @@ const AdminClients: React.FC = () => {
             <Input
               label="Client Name"
               value={newClient.name}
-              onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewClient({ ...newClient, name: e.target.value })}
               required
             />
             <Input
               label="Email"
               type="email"
               value={newClient.email}
-              onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewClient({ ...newClient, email: e.target.value })}
               required
             />
           </div>
@@ -413,7 +413,7 @@ const AdminClients: React.FC = () => {
           <Input
             label="Company"
             value={newClient.company}
-            onChange={(e) => setNewClient({ ...newClient, company: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewClient({ ...newClient, company: e.target.value })}
             required
           />
           
@@ -436,7 +436,7 @@ const AdminClients: React.FC = () => {
               label="Monthly Fee"
               type="number"
               value={newClient.monthly_fee}
-              onChange={(e) => setNewClient({ ...newClient, monthly_fee: parseInt(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewClient({ ...newClient, monthly_fee: parseInt(e.target.value) })}
               required
             />
           </div>

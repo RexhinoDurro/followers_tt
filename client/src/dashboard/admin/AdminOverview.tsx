@@ -637,7 +637,7 @@ const AdminOverview: React.FC = () => {
           <Input
             label="Task Title"
             value={newTask.title}
-            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTask({ ...newTask, title: e.target.value })}
             required
           />
           <div>
@@ -673,7 +673,7 @@ const AdminOverview: React.FC = () => {
           <Input
             label="Assigned To"
             value={newTask.assigned_to}
-            onChange={(e) => setNewTask({ ...newTask, assigned_to: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTask({ ...newTask, assigned_to: e.target.value })}
             required
           />
           <div className="grid grid-cols-2 gap-4">
@@ -695,7 +695,7 @@ const AdminOverview: React.FC = () => {
               label="Due Date"
               type="datetime-local"
               value={newTask.due_date}
-              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTask({ ...newTask, due_date: e.target.value })}
               required
             />
           </div>
@@ -742,14 +742,14 @@ const AdminOverview: React.FC = () => {
               type="number"
               step="0.01"
               value={newInvoice.amount}
-              onChange={(e) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
               required
             />
             <Input
               label="Due Date"
               type="date"
               value={newInvoice.due_date}
-              onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
               required
             />
           </div>

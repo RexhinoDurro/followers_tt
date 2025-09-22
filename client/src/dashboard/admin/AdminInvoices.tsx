@@ -606,14 +606,14 @@ const AdminInvoices: React.FC = () => {
               type="number"
               step="0.01"
               value={newInvoice.amount}
-              onChange={(e) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice({ ...newInvoice, amount: e.target.value })}
               required
             />
             <Input
               label="Due Date"
               type="date"
               value={newInvoice.due_date}
-              onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
               required
             />
           </div>

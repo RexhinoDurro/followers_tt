@@ -236,13 +236,13 @@ const AdminSettings: React.FC = () => {
                     <Input
                       label="First Name"
                       value={profileData.first_name}
-                      onChange={(e) => setProfileData({...profileData, first_name: e.target.value})}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, first_name: e.target.value})}
                       required
                     />
                     <Input
                       label="Last Name"
                       value={profileData.last_name}
-                      onChange={(e) => setProfileData({...profileData, last_name: e.target.value})}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, last_name: e.target.value})}
                       required
                     />
                   </div>
@@ -251,14 +251,14 @@ const AdminSettings: React.FC = () => {
                     label="Email"
                     type="email"
                     value={profileData.email}
-                    onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, email: e.target.value})}
                     required
                   />
                   
                   <Input
                     label="Company"
                     value={profileData.company}
-                    onChange={(e) => setProfileData({...profileData, company: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, company: e.target.value})}
                   />
                   
                   <div className="flex justify-end">
@@ -527,7 +527,7 @@ const AdminSettings: React.FC = () => {
               label="Current Password"
               type={showPasswords.current ? 'text' : 'password'}
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value)}
               required
             />
             <button
@@ -544,7 +544,7 @@ const AdminSettings: React.FC = () => {
               label="New Password"
               type={showPasswords.new ? 'text' : 'password'}
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)}
               required
             />
             <button
@@ -561,7 +561,7 @@ const AdminSettings: React.FC = () => {
               label="Confirm New Password"
               type={showPasswords.confirm ? 'text' : 'password'}
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
               required
             />
             <button
