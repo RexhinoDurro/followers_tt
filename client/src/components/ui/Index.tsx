@@ -1,7 +1,8 @@
 // components/ui/index.tsx - Barrel exports for UI components
-export { Button } from './Button';
-export { Card } from './Card';
-export { Input } from './Input';
-export { Modal } from './Modal';
-export { Badge } from './Badge';
-export { LoadingSpinner } from './LoadingSpinner';
+// Explicit re-exports for better cross-platform compatibility
+export { Button } from './Button.tsx';
+export { Card } from './Card.tsx';
+export { Input } from './Input.tsx';
+export { Modal } from './Modal.tsx';
+export { Badge } from './Badge.tsx';
+export { LoadingSpinner } from './LoadingSpinner.tsx';
