@@ -1,10 +1,10 @@
-// client/src/dashboard/client/ClientBilling.tsx - Updated for PayPal
+// client/src/dashboard/client/ClientBilling.tsx - Updated for proper plan selection flow
 import React, { useState, useEffect } from 'react';
 import {
   CreditCard, DollarSign, FileText, Download, Calendar,
   CheckCircle, AlertCircle, Clock, TrendingUp, Receipt, 
   Award, Settings, Plus, Star, ArrowLeft,
-  Loader2, Eye,  AlertTriangle, 
+  Loader2, Eye, AlertTriangle, 
 } from 'lucide-react';
 import { Card, Button, Badge, Modal } from '../../components/ui';
 import { PayPalElements } from '../../components/PayPalElements';
@@ -18,6 +18,7 @@ interface Plan {
   price: number;
   features: string[];
   isCurrent?: boolean;
+  recommended?: boolean;
 }
 
 interface PlansResponse {
@@ -42,7 +43,7 @@ interface CurrentSubscription {
   billing_cycle: 'monthly' | 'annually';
   next_billing_date: string;
   features: string[];
-  status: 'active' | 'cancelled' | 'past_due';
+  status: 'active' | 'cancelled' | 'past_due' | 'none';
   subscriptionId?: string;
   can_cancel: boolean;
   cancel_at_period_end?: boolean;
@@ -53,15 +54,6 @@ interface BillingStats {
   currentBalance: number;
   nextPayment: number;
   nextPaymentDate: string;
-}
-
-interface ApiError {
-  response?: {
-    data?: {
-      error?: string;
-    };
-  };
-  message?: string;
 }
 
 interface SubscriptionResponse {
@@ -88,7 +80,7 @@ interface CancelResponse {
 type BillingStep = 'overview' | 'plan-selection' | 'plan-details' | 'payment' | 'success';
 
 const ClientBilling: React.FC = () => {
-  const { } = useAuth();
+  useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<BillingStep>('overview');
@@ -105,12 +97,13 @@ const ClientBilling: React.FC = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [processingSubscription, setProcessingSubscription] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'payment-methods' | 'subscription'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'subscription'>('overview');
   
   // Modal states
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showInvoicePaymentModal, setShowInvoicePaymentModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
@@ -156,9 +149,9 @@ const ClientBilling: React.FC = () => {
         nextPaymentDate: subscriptionData?.next_billing_date || new Date().toISOString(),
       });
 
-      // Show plan selection if no subscription
-      if (!subscriptionData && plansArray.length > 0) {
-        console.log('No subscription found, showing plan selection');
+      // Show plan selection if no subscription or subscription status is 'none'
+      if (!subscriptionData || subscriptionData.status === 'none' || subscriptionData.plan === 'none') {
+        console.log('No active subscription found, showing plan selection');
         setCurrentStep('plan-selection');
       }
     } catch (error) {
@@ -192,10 +185,9 @@ const ClientBilling: React.FC = () => {
       
       alert(response.message);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to cancel subscription:', err);
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || apiError.message || 'Failed to cancel subscription');
+      setError(err.response?.data?.error || err.message || 'Failed to cancel subscription');
     } finally {
       setProcessingSubscription(false);
     }
@@ -211,10 +203,9 @@ const ClientBilling: React.FC = () => {
       setPaypalOrderData(response);
       setShowInvoicePaymentModal(true);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create invoice payment:', err);
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || apiError.message || 'Failed to create payment');
+      setError(err.response?.data?.error || err.message || 'Failed to create payment');
     } finally {
       setProcessingSubscription(false);
     }
@@ -239,10 +230,29 @@ const ClientBilling: React.FC = () => {
       setPaypalSubscriptionData(data);
       setCurrentStep('payment');
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Subscription creation failed:', err);
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.error || apiError.message || 'Failed to create subscription');
+      setError(err.response?.data?.error || err.message || 'Failed to create subscription');
+    } finally {
+      setProcessingSubscription(false);
+    }
+  };
+
+  const handleUpgradePlan = async (newPlan: Plan) => {
+    try {
+      setProcessingSubscription(true);
+      setError(null);
+      
+      // For plan changes, we'll cancel current subscription and create new one
+      // In a real implementation, you might want to handle this differently
+      
+      setSelectedPlan(newPlan);
+      setCurrentStep('plan-details');
+      setShowUpgradeModal(false);
+      
+    } catch (err: any) {
+      console.error('Failed to upgrade plan:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to upgrade plan');
     } finally {
       setProcessingSubscription(false);
     }
@@ -308,12 +318,12 @@ const ClientBilling: React.FC = () => {
           <div
             key={plan.id}
             className={`relative cursor-pointer transition-all duration-200 hover:shadow-lg ${
-              plan.name === 'Pro' ? 'ring-2 ring-blue-500 transform scale-105' : 'hover:shadow-xl'
+              plan.recommended ? 'ring-2 ring-blue-500 transform scale-105' : 'hover:shadow-xl'
             }`}
             onClick={() => handleSelectPlan(plan)}
           >
             <Card>
-              {plan.name === 'Pro' && (
+              {plan.recommended && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <span className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center">
                     <Star className="w-4 h-4 mr-1" />
@@ -340,7 +350,7 @@ const ClientBilling: React.FC = () => {
                 
                 <Button 
                   className="w-full"
-                  variant={plan.name === 'Pro' ? 'primary' : 'outline'}
+                  variant={plan.recommended ? 'primary' : 'outline'}
                 >
                   Select {plan.name}
                 </Button>
@@ -469,7 +479,7 @@ const ClientBilling: React.FC = () => {
         <div className="p-8">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Success!</h2>
-          <p className="text-gray-600 mb-6">Operation completed successfully.</p>
+          <p className="text-gray-600 mb-6">Your subscription has been activated successfully.</p>
         </div>
       </Card>
     </div>
@@ -483,8 +493,11 @@ const ClientBilling: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Billing & Payments</h1>
           <p className="text-gray-600 mt-1">Manage your subscription and payments via PayPal</p>
         </div>
-        {currentSubscription ? (
+        {currentSubscription && currentSubscription.status !== 'none' ? (
           <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setShowUpgradeModal(true)}>
+              Change Plan
+            </Button>
             {currentSubscription.can_cancel && (
               <Button variant="outline" onClick={() => setShowCancelModal(true)}>
                 Cancel Subscription
@@ -509,7 +522,7 @@ const ClientBilling: React.FC = () => {
         </div>
       )}
 
-      {currentSubscription ? (
+      {currentSubscription && currentSubscription.status !== 'none' ? (
         <>
           {/* Billing Overview Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -594,17 +607,6 @@ const ClientBilling: React.FC = () => {
                   {/* Current Subscription */}
                   <Card title="Current Subscription">
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900">{currentSubscription.plan}</h3>
-                          <p className="text-gray-600">Billed {currentSubscription.billing_cycle}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(currentSubscription.price)}</p>
-                          <p className="text-sm text-gray-600">per month</p>
-                        </div>
-                      </div>
-                      
                       <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                         <div className="flex items-center">
                           <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
@@ -766,6 +768,9 @@ const ClientBilling: React.FC = () => {
                   </div>
 
                   <div className="flex gap-4">
+                    <Button variant="outline" onClick={() => setShowUpgradeModal(true)}>
+                      Change Plan
+                    </Button>
                     {currentSubscription.can_cancel && (
                       <Button variant="outline" onClick={() => setShowCancelModal(true)}>
                         Cancel Subscription
@@ -792,6 +797,50 @@ const ClientBilling: React.FC = () => {
       )}
 
       {/* Modals */}
+      
+      {/* Upgrade/Change Plan Modal */}
+      <Modal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Change Your Plan"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Select a new plan to upgrade or downgrade your subscription. Your billing will be adjusted accordingly.
+          </p>
+          
+          <div className="grid grid-cols-1 gap-4">
+            {availablePlans.map((plan) => (
+              <div
+                key={plan.id}
+                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                  currentSubscription?.plan === plan.name 
+                    ? 'bg-blue-50 border-blue-300' 
+                    : 'hover:bg-gray-50 border-gray-200'
+                }`}
+                onClick={() => currentSubscription?.plan !== plan.name && handleUpgradePlan(plan)}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{plan.name}</h4>
+                    <p className="text-gray-600">{formatCurrency(plan.price)}/month</p>
+                  </div>
+                  {currentSubscription?.plan === plan.name && (
+                    <Badge variant="primary">Current Plan</Badge>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">
+                    {plan.features.slice(0, 2).join(', ')}
+                    {plan.features.length > 2 && ` and ${plan.features.length - 2} more features`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
       
       {/* Cancel Subscription Modal */}
       <Modal

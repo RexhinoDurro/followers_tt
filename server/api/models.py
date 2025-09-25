@@ -120,27 +120,36 @@ class Client(models.Model):
         ('active', 'Active'),
         ('pending', 'Pending'),
         ('paused', 'Paused'),
+        ('cancelled', 'Cancelled'),  # Added cancelled status
     ]
     
     PAYMENT_STATUS_CHOICES = [
         ('paid', 'Paid'),
         ('overdue', 'Overdue'),
         ('pending', 'Pending'),
+        ('none', 'No Payment Required'),  # Added none status
+    ]
+    
+    PLAN_CHOICES = [
+        ('starter', 'Starter Plan'),
+        ('pro', 'Pro Plan'),
+        ('premium', 'Premium Plan'),
+        ('none', 'No Plan Selected'),  # Added none option
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
+    user = models.OneToOneField('User', on_delete=models.CASCADE, related_name='client_profile')
     name = models.CharField(max_length=255)
     email = models.EmailField()
     company = models.CharField(max_length=255)
-    package = models.CharField(max_length=255)
-    monthly_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    package = models.CharField(max_length=255, default='No Plan Selected')
+    monthly_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     start_date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='none')
     platforms = models.JSONField(default=list)
-    account_manager = models.CharField(max_length=255)
-    next_payment = models.DateField()
+    account_manager = models.CharField(max_length=255, default='Admin')
+    next_payment = models.DateField(null=True, blank=True)  # Allow null for no active subscription
     total_spent = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -149,21 +158,24 @@ class Client(models.Model):
     # PAYPAL FIELDS (replacing Stripe fields)
     paypal_customer_id = models.CharField(max_length=255, blank=True, null=True)  # PayPal payer ID
     paypal_subscription_id = models.CharField(max_length=255, blank=True, null=True)
-    current_plan = models.CharField(max_length=50, blank=True, null=True, choices=[
-        ('starter', 'Starter'),
-        ('pro', 'Pro'),
-        ('premium', 'Premium'),
-    ])
+    current_plan = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        choices=PLAN_CHOICES,
+        default='none'
+    )
     subscription_start_date = models.DateTimeField(blank=True, null=True)
     subscription_end_date = models.DateTimeField(blank=True, null=True)
     trial_end_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.name} - {self.company}"
+        return f"{self.name} - {self.company} ({self.get_current_plan_display()})"
 
     @property
     def total_followers(self):
         """Calculate total followers across all connected accounts"""
+        from .models import RealTimeMetrics  # Import here to avoid circular import
         latest_metrics = RealTimeMetrics.objects.filter(
             account__client=self
         ).order_by('account', '-date').distinct('account')
@@ -172,6 +184,7 @@ class Client(models.Model):
     @property
     def average_engagement_rate(self):
         """Calculate average engagement rate across all accounts"""
+        from .models import RealTimeMetrics  # Import here to avoid circular import
         latest_metrics = RealTimeMetrics.objects.filter(
             account__client=self
         ).order_by('account', '-date').distinct('account')
@@ -185,7 +198,24 @@ class Client(models.Model):
     @property
     def has_active_subscription(self):
         """Check if client has an active PayPal subscription"""
-        return bool(self.paypal_subscription_id and self.status == 'active')
+        return bool(
+            self.paypal_subscription_id and 
+            self.status == 'active' and 
+            self.current_plan and 
+            self.current_plan != 'none'
+        )
+
+    @property
+    def subscription_status_display(self):
+        """Get human-readable subscription status"""
+        if not self.current_plan or self.current_plan == 'none':
+            return 'No Plan Selected'
+        elif self.status == 'active':
+            return f'Active - {self.get_current_plan_display()}'
+        elif self.status == 'cancelled':
+            return f'Cancelled - {self.get_current_plan_display()}'
+        else:
+            return f'{self.get_status_display()} - {self.get_current_plan_display()}'
 
     class Meta:
         ordering = ['-created_at']

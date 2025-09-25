@@ -1,4 +1,4 @@
-# api/views/paypal_billing_views.py
+# api/views/paypal_billing_views.py - Updated with proper subscription flow
 import logging
 import json
 from decimal import Decimal
@@ -18,48 +18,45 @@ from ..models import Client
 
 logger = logging.getLogger(__name__)
 
-# PayPal Plan Configuration
+# PayPal Plan Configuration - UPDATED with English translations
 PAYPAL_PLANS = {
     'starter': {
         'id': 'starter',
         'name': 'Starter Plan',
-        'price': 100,
-        'paypal_plan_id': settings.PAYPAL_STARTER_PLAN_ID,
+        'price': 100,  # $100/month (100€ converted)
+        'paypal_plan_id': getattr(settings, 'PAYPAL_STARTER_PLAN_ID', ''),
         'features': [
-            'Instagram Growth Management',
-            'Basic Analytics Dashboard',
-            'Monthly Performance Reports',
-            'Email Support',
-            'Up to 2 Social Accounts'
+            '12 posts (photos/reels)',
+            '12 interactive stories', 
+            'Organic growth and hashtag research',
+            'Monthly growth reports and statistics',
+            'Ideal for small businesses'
         ]
     },
     'pro': {
-        'id': 'pro',
+        'id': 'pro', 
         'name': 'Pro Plan',
-        'price': 250,
-        'paypal_plan_id': settings.PAYPAL_PRO_PLAN_ID,
+        'price': 250,  # $250/month (250€ converted)
+        'paypal_plan_id': getattr(settings, 'PAYPAL_PRO_PLAN_ID', ''),
         'features': [
-            'Multi-Platform Management',
-            'Advanced Analytics',
-            'Weekly Performance Reports',
-            'Priority Support',
-            'Up to 5 Social Accounts',
-            'Custom Content Strategies'
+            '20 posts + reels',
+            'Advanced promotional campaigns',
+            'Growth strategy and blog optimization',
+            'Enhanced reports and recommendations',
+            'Aggressive growth strategies'
         ]
     },
     'premium': {
         'id': 'premium',
-        'name': 'Premium Plan',
-        'price': 400,
-        'paypal_plan_id': settings.PAYPAL_PREMIUM_PLAN_ID,
+        'name': 'Premium Plan', 
+        'price': 400,  # $400/month (400€ converted)
+        'paypal_plan_id': getattr(settings, 'PAYPAL_PREMIUM_PLAN_ID', ''),
         'features': [
-            'Full-Service Management',
-            'Real-time Analytics',
-            'Daily Performance Reports',
-            '24/7 Dedicated Support',
-            'Unlimited Social Accounts',
-            'Custom Content Creation',
-            'Influencer Outreach'
+            'Instagram + Facebook + TikTok',
+            '30+ posts (design, reels, carousel)',
+            'Premium advertising with budget allocation',
+            'Professional management and plotting',
+            'Full-service social media management'
         ]
     }
 }
@@ -68,9 +65,9 @@ class PayPalAPIClient:
     """PayPal API client for handling authentication and requests"""
     
     def __init__(self):
-        self.client_id = settings.PAYPAL_CLIENT_ID
-        self.client_secret = settings.PAYPAL_CLIENT_SECRET
-        self.base_url = settings.PAYPAL_BASE_URL
+        self.client_id = getattr(settings, 'PAYPAL_CLIENT_ID', '')
+        self.client_secret = getattr(settings, 'PAYPAL_CLIENT_SECRET', '')
+        self.base_url = getattr(settings, 'PAYPAL_BASE_URL', 'https://api-m.sandbox.paypal.com')
         self._access_token = None
     
     def get_access_token(self):
@@ -146,79 +143,131 @@ def get_available_plans(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-@api_view(['POST'])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def create_subscription(request):
-    """Create a PayPal subscription"""
+def get_current_subscription(request):
+    """Get current subscription details for the authenticated user"""
     try:
-        plan_name = request.data.get('plan_name')
-        price_id = request.data.get('price_id', '').replace('price_', '').replace('_monthly', '')
+        # Get the client profile for the current user
+        try:
+            client = Client.objects.get(user=request.user)
+        except Client.DoesNotExist:
+            return Response({
+                'plan': 'none',
+                'planId': 'none',
+                'price': 0,
+                'billing_cycle': 'monthly',
+                'next_billing_date': None,
+                'features': [],
+                'status': 'none',
+                'subscriptionId': None,
+                'can_cancel': False,
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': False,
+                'message': 'No client profile found'
+            })
         
-        # Find the plan
-        plan_data = None
-        for plan_id, plan in PAYPAL_PLANS.items():
-            if plan_id == price_id or plan['name'] == plan_name:
-                plan_data = plan
-                break
+        # If no current plan or plan is 'none', return basic info
+        if not client.current_plan or client.current_plan == 'none':
+            return Response({
+                'plan': 'none',
+                'planId': 'none',
+                'price': 0,
+                'billing_cycle': 'monthly',
+                'next_billing_date': None,
+                'features': [],
+                'status': 'none',
+                'subscriptionId': None,
+                'can_cancel': False,
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': False
+            })
         
-        if not plan_data:
-            return Response(
-                {'error': 'Invalid plan selected'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Get plan details
+        plan_details = PAYPAL_PLANS.get(client.current_plan, {})
         
+        # If no PayPal subscription ID, return local data
+        if not client.paypal_subscription_id:
+            return Response({
+                'plan': client.current_plan,
+                'planId': client.current_plan,
+                'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
+                'billing_cycle': 'monthly',
+                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
+                'features': plan_details.get('features', []),
+                'status': 'inactive',
+                'subscriptionId': None,
+                'can_cancel': False,
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': False
+            })
+        
+        # Fetch current subscription details from PayPal
         paypal_client = PayPalAPIClient()
         
-        # Create subscription
-        subscription_data = {
-            "plan_id": plan_data['paypal_plan_id'],
-            "subscriber": {
-                "name": {
-                    "given_name": request.user.first_name or "Customer",
-                    "surname": request.user.last_name or "User"
+        try:
+            subscription = paypal_client.make_request(
+                'GET', 
+                f'/v1/billing/subscriptions/{client.paypal_subscription_id}'
+            )
+            
+            # Extract billing info
+            billing_info = subscription.get('billing_info', {})
+            next_billing_time = billing_info.get('next_billing_time')
+            
+            subscription_data = {
+                'plan': client.current_plan,
+                'planId': client.current_plan,
+                'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
+                'billing_cycle': 'monthly',
+                'next_billing_date': next_billing_time,
+                'features': plan_details.get('features', []),
+                'status': 'active' if subscription.get('status') == 'ACTIVE' else subscription.get('status', '').lower(),
+                'subscriptionId': subscription.get('id'),
+                'can_cancel': subscription.get('status') == 'ACTIVE',
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': subscription.get('status') == 'ACTIVE',
+                'subscriber_info': {
+                    'name': subscription.get('subscriber', {}).get('name', {}),
+                    'email': subscription.get('subscriber', {}).get('email_address')
                 },
-                "email_address": request.user.email
-            },
-            "application_context": {
-                "brand_name": "VisionBoost",
-                "locale": "en-US",
-                "shipping_preference": "NO_SHIPPING",
-                "user_action": "SUBSCRIBE_NOW",
-                "payment_method": {
-                    "payer_selected": "PAYPAL",
-                    "payee_preferred": "IMMEDIATE_PAYMENT_REQUIRED"
-                },
-                "return_url": f"{settings.FRONTEND_URL}/billing/success",
-                "cancel_url": f"{settings.FRONTEND_URL}/billing/cancel"
+                'paypal_details': {
+                    'plan_id': subscription.get('plan_id'),
+                    'create_time': subscription.get('create_time'),
+                    'update_time': subscription.get('update_time'),
+                    'status_update_time': subscription.get('status_update_time')
+                }
             }
-        }
-        
-        subscription = paypal_client.make_request('POST', '/v1/billing/subscriptions', subscription_data)
-        
-        # Find approval URL
-        approval_url = None
-        for link in subscription.get('links', []):
-            if link.get('rel') == 'approve':
-                approval_url = link.get('href')
-                break
-        
-        if not approval_url:
-            raise Exception("No approval URL found in PayPal response")
-        
-        logger.info(f"Created PayPal subscription {subscription['id']} for user {request.user.id}")
-        
-        return Response({
-            'subscription_id': subscription['id'],
-            'approval_url': approval_url,
-            'status': subscription.get('status', 'APPROVAL_PENDING'),
-            'plan_name': plan_data['name'],
-            'amount': plan_data['price']
-        })
-        
+            
+            return Response(subscription_data)
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to fetch subscription from PayPal: {e}")
+            # Return local data if PayPal API fails
+            return Response({
+                'plan': client.current_plan,
+                'planId': client.current_plan,
+                'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
+                'billing_cycle': 'monthly',
+                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
+                'features': plan_details.get('features', []),
+                'status': 'unknown',
+                'subscriptionId': client.paypal_subscription_id,
+                'can_cancel': True,
+                'cancel_at_period_end': False,
+                'payment_method': 'paypal',
+                'auto_renewal': False,
+                'error': 'Could not fetch latest status from PayPal'
+            })
+            
     except Exception as e:
-        logger.error(f"Error creating subscription: {e}")
+        logger.error(f"Error getting current subscription: {e}")
         return Response(
-            {'error': 'Failed to create subscription'},
+            {'error': 'Failed to retrieve subscription details'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -258,11 +307,12 @@ def approve_subscription(request):
                 
                 # Update client subscription details
                 client.paypal_subscription_id = subscription_id
-                client.current_plan = current_plan
+                client.current_plan = current_plan or 'starter'  # Default to starter if not found
                 client.monthly_fee = monthly_fee
                 client.status = 'active'
                 client.payment_status = 'paid'
                 client.subscription_start_date = timezone.now()
+                client.package = PAYPAL_PLANS.get(current_plan, {}).get('name', 'Unknown Plan')
                 
                 # Get subscriber info
                 subscriber = subscription.get('subscriber', {})
@@ -275,21 +325,31 @@ def approve_subscription(request):
                     client.next_payment = dateutil.parser.parse(
                         billing_info['next_billing_time']
                     ).date()
+                else:
+                    # Default to 1 month from now
+                    from datetime import timedelta
+                    client.next_payment = timezone.now().date() + timedelta(days=30)
                 
                 client.save()
                 
+                logger.info(f"Subscription {subscription_id} activated for user {request.user.id}")
+                
             except Client.DoesNotExist:
                 logger.error(f"Client profile not found for user {request.user.id}")
+                return Response(
+                    {'error': 'Client profile not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
             except Exception as e:
                 logger.error(f"Error updating client subscription: {e}")
-            
-            logger.info(f"Subscription {subscription_id} activated for user {request.user.id}")
             
             return Response({
                 'success': True,
                 'subscription_id': subscription_id,
                 'status': 'ACTIVE',
-                'message': 'Subscription activated successfully'
+                'message': 'Subscription activated successfully',
+                'plan': current_plan,
+                'monthly_fee': monthly_fee
             })
         else:
             return Response(
@@ -306,45 +366,62 @@ def approve_subscription(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def create_order(request):
-    """Create a one-time PayPal order"""
+def create_subscription(request):
+    """Create a PayPal subscription"""
     try:
-        amount = request.data.get('amount')
-        description = request.data.get('description', 'Service Payment')
+        plan_name = request.data.get('plan_name')
+        price_id = request.data.get('price_id', '').replace('price_', '').replace('_monthly', '')
         
-        if not amount:
+        # Find the plan
+        plan_data = None
+        for plan_id, plan in PAYPAL_PLANS.items():
+            if plan_id == price_id or plan['name'] == plan_name:
+                plan_data = plan
+                break
+        
+        if not plan_data:
             return Response(
-                {'error': 'Amount is required'},
+                {'error': 'Invalid plan selected'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not plan_data.get('paypal_plan_id'):
+            return Response(
+                {'error': f'PayPal plan ID not configured for {plan_data["name"]}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         paypal_client = PayPalAPIClient()
         
-        order_data = {
-            "intent": "CAPTURE",
-            "purchase_units": [{
-                "amount": {
-                    "currency_code": "USD",
-                    "value": str(amount)
+        # Create subscription
+        subscription_data = {
+            "plan_id": plan_data['paypal_plan_id'],
+            "subscriber": {
+                "name": {
+                    "given_name": request.user.first_name or "Customer",
+                    "surname": request.user.last_name or "User"
                 },
-                "description": description
-            }],
+                "email_address": request.user.email
+            },
             "application_context": {
-                "brand_name": "VisionBoost",
+                "brand_name": "VisionBoost Agency",
                 "locale": "en-US",
-                "landing_page": "BILLING",
                 "shipping_preference": "NO_SHIPPING",
-                "user_action": "PAY_NOW",
-                "return_url": f"{settings.FRONTEND_URL}/payment/success",
-                "cancel_url": f"{settings.FRONTEND_URL}/payment/cancel"
+                "user_action": "SUBSCRIBE_NOW",
+                "payment_method": {
+                    "payer_selected": "PAYPAL",
+                    "payee_preferred": "IMMEDIATE_PAYMENT_REQUIRED"
+                },
+                "return_url": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/billing/success",
+                "cancel_url": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/billing/cancel"
             }
         }
         
-        order = paypal_client.make_request('POST', '/v2/checkout/orders', order_data)
+        subscription = paypal_client.make_request('POST', '/v1/billing/subscriptions', subscription_data)
         
         # Find approval URL
         approval_url = None
-        for link in order.get('links', []):
+        for link in subscription.get('links', []):
             if link.get('rel') == 'approve':
                 approval_url = link.get('href')
                 break
@@ -352,272 +429,22 @@ def create_order(request):
         if not approval_url:
             raise Exception("No approval URL found in PayPal response")
         
-        logger.info(f"Created PayPal order {order['id']} for user {request.user.id}")
+        logger.info(f"Created PayPal subscription {subscription['id']} for user {request.user.id}")
         
         return Response({
-            'order_id': order['id'],
+            'subscription_id': subscription['id'],
             'approval_url': approval_url,
-            'status': order.get('status', 'CREATED'),
-            'amount': amount,
-            'description': description
+            'status': subscription.get('status', 'APPROVAL_PENDING'),
+            'plan_name': plan_data['name'],
+            'amount': plan_data['price']
         })
         
     except Exception as e:
-        logger.error(f"Error creating order: {e}")
+        logger.error(f"Error creating subscription: {e}")
         return Response(
-            {'error': 'Failed to create order'},
+            {'error': 'Failed to create subscription'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def capture_payment(request):
-    """Capture a PayPal payment"""
-    try:
-        order_id = request.data.get('order_id')
-        
-        if not order_id:
-            return Response(
-                {'error': 'Order ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        paypal_client = PayPalAPIClient()
-        
-        # Capture the payment
-        capture = paypal_client.make_request('POST', f'/v2/checkout/orders/{order_id}/capture')
-        
-        if capture.get('status') == 'COMPLETED':
-            # TODO: Update payment record in database
-            logger.info(f"Payment captured for order {order_id}, user {request.user.id}")
-            
-            return Response({
-                'success': True,
-                'order_id': order_id,
-                'status': 'COMPLETED',
-                'message': 'Payment captured successfully'
-            })
-        else:
-            return Response(
-                {'error': f'Payment capture failed. Status: {capture.get("status")}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
-    except Exception as e:
-        logger.error(f"Error capturing payment: {e}")
-        return Response(
-            {'error': 'Failed to capture payment'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@method_decorator(csrf_exempt, name='dispatch')
-@api_view(['POST'])
-def paypal_webhook(request):
-    """Handle PayPal webhooks"""
-    try:
-        # TODO: Verify webhook signature for security
-        webhook_data = json.loads(request.body)
-        event_type = webhook_data.get('event_type')
-        
-        logger.info(f"Received PayPal webhook: {event_type}")
-        
-        if event_type == 'BILLING.SUBSCRIPTION.ACTIVATED':
-            # Handle subscription activation
-            subscription = webhook_data.get('resource', {})
-            subscription_id = subscription.get('id')
-            
-            # Find client by subscription ID and update status
-            try:
-                client = Client.objects.get(paypal_subscription_id=subscription_id)
-                client.status = 'active'
-                client.payment_status = 'paid'
-                
-                # Update subscription start date if not set
-                if not client.subscription_start_date:
-                    client.subscription_start_date = timezone.now()
-                
-                client.save()
-                logger.info(f"Subscription {subscription_id} activated via webhook for client {client.id}")
-            except Client.DoesNotExist:
-                logger.warning(f"Client not found for subscription {subscription_id}")
-            
-        elif event_type == 'BILLING.SUBSCRIPTION.CANCELLED':
-            # Handle subscription cancellation
-            subscription = webhook_data.get('resource', {})
-            subscription_id = subscription.get('id')
-            
-            try:
-                client = Client.objects.get(paypal_subscription_id=subscription_id)
-                client.status = 'paused'
-                client.payment_status = 'overdue'
-                client.subscription_end_date = timezone.now()
-                client.save()
-                logger.info(f"Subscription {subscription_id} cancelled via webhook for client {client.id}")
-            except Client.DoesNotExist:
-                logger.warning(f"Client not found for subscription {subscription_id}")
-            
-        elif event_type == 'BILLING.SUBSCRIPTION.SUSPENDED':
-            # Handle subscription suspension
-            subscription = webhook_data.get('resource', {})
-            subscription_id = subscription.get('id')
-            
-            try:
-                client = Client.objects.get(paypal_subscription_id=subscription_id)
-                client.status = 'paused'
-                client.payment_status = 'overdue'
-                client.save()
-                logger.info(f"Subscription {subscription_id} suspended via webhook for client {client.id}")
-            except Client.DoesNotExist:
-                logger.warning(f"Client not found for subscription {subscription_id}")
-                
-        elif event_type == 'PAYMENT.SALE.COMPLETED':
-            # Handle successful subscription payment
-            sale = webhook_data.get('resource', {})
-            billing_agreement_id = sale.get('billing_agreement_id')
-            
-            if billing_agreement_id:
-                try:
-                    client = Client.objects.get(paypal_subscription_id=billing_agreement_id)
-                    client.payment_status = 'paid'
-                    client.total_spent += Decimal(sale.get('amount', {}).get('total', 0))
-                    
-                    # Update next payment date (add 1 month)
-                    from dateutil.relativedelta import relativedelta
-                    if client.next_payment:
-                        client.next_payment = client.next_payment + relativedelta(months=1)
-                    
-                    client.save()
-                    logger.info(f"Payment completed via webhook for client {client.id}")
-                except Client.DoesNotExist:
-                    logger.warning(f"Client not found for billing agreement {billing_agreement_id}")
-            
-        elif event_type == 'PAYMENT.CAPTURE.COMPLETED':
-            # Handle one-time payment completion
-            capture = webhook_data.get('resource', {})
-            capture_id = capture.get('id')
-            logger.info(f"Payment {capture_id} completed via webhook")
-        
-        return JsonResponse({'status': 'success'})
-        
-    except Exception as e:
-        logger.error(f"Error processing PayPal webhook: {e}")
-        return JsonResponse({'error': 'Webhook processing failed'}, status=500)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_current_subscription(request):
-    """Get current subscription details for the authenticated user"""
-    try:
-        # Get the client profile for the current user
-        try:
-            client = Client.objects.get(user=request.user)
-        except Client.DoesNotExist:
-            return Response({
-                'subscription': None,
-                'message': 'No client profile found'
-            })
-        
-        # If no PayPal subscription, return basic info
-        if not client.paypal_subscription_id:
-            return Response({
-                'plan': client.current_plan or 'none',
-                'planId': client.current_plan or 'none',
-                'price': float(client.monthly_fee) if client.monthly_fee else 0,
-                'billing_cycle': 'monthly',
-                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
-                'features': PAYPAL_PLANS.get(client.current_plan, {}).get('features', []) if client.current_plan else [],
-                'status': 'none' if not client.current_plan else 'inactive',
-                'subscriptionId': None,
-                'can_cancel': False,
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': False
-            })
-        
-        # Fetch current subscription details from PayPal
-        paypal_client = PayPalAPIClient()
-        
-        try:
-            subscription = paypal_client.make_request(
-                'GET', 
-                f'/v1/billing/subscriptions/{client.paypal_subscription_id}'
-            )
-            
-            # Extract billing info
-            billing_info = subscription.get('billing_info', {})
-            next_billing_time = billing_info.get('next_billing_time')
-            last_payment = billing_info.get('last_payment', {})
-            
-            # Get plan details
-            plan_id = subscription.get('plan_id', '')
-            current_plan = None
-            plan_details = None
-            
-            for plan_key, plan_data in PAYPAL_PLANS.items():
-                if plan_data['paypal_plan_id'] == plan_id:
-                    current_plan = plan_key
-                    plan_details = plan_data
-                    break
-            
-            # Update local client record if needed
-            if client.current_plan != current_plan and current_plan:
-                client.current_plan = current_plan
-                client.save()
-            
-            subscription_data = {
-                'plan': current_plan or client.current_plan,
-                'planId': current_plan or client.current_plan,
-                'price': float(last_payment.get('amount', {}).get('value', 0)) if last_payment else plan_details.get('price', 0),
-                'billing_cycle': 'monthly',
-                'next_billing_date': next_billing_time,
-                'features': plan_details.get('features', []) if plan_details else [],
-                'status': 'active' if subscription.get('status') == 'ACTIVE' else subscription.get('status', '').lower(),
-                'subscriptionId': subscription.get('id'),
-                'can_cancel': subscription.get('status') == 'ACTIVE',
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': subscription.get('status') == 'ACTIVE',
-                'subscriber_info': {
-                    'name': subscription.get('subscriber', {}).get('name', {}),
-                    'email': subscription.get('subscriber', {}).get('email_address')
-                },
-                'paypal_details': {
-                    'plan_id': plan_id,
-                    'create_time': subscription.get('create_time'),
-                    'update_time': subscription.get('update_time'),
-                    'status_update_time': subscription.get('status_update_time')
-                }
-            }
-            
-            return Response(subscription_data)
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch subscription from PayPal: {e}")
-            # Return local data if PayPal API fails
-            return Response({
-                'plan': client.current_plan or 'none',
-                'planId': client.current_plan or 'none',
-                'price': float(client.monthly_fee) if client.monthly_fee else 0,
-                'billing_cycle': 'monthly',
-                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
-                'features': PAYPAL_PLANS.get(client.current_plan, {}).get('features', []) if client.current_plan else [],
-                'status': 'unknown',
-                'subscriptionId': client.paypal_subscription_id,
-                'can_cancel': True,
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': False,
-                'error': 'Could not fetch latest status from PayPal'
-            })
-            
-    except Exception as e:
-        logger.error(f"Error getting current subscription: {e}")
-        return Response(
-            {'error': 'Failed to retrieve subscription details'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -654,7 +481,8 @@ def cancel_subscription(request):
         )
         
         # Update local client record
-        client.status = 'paused'
+        client.status = 'cancelled'
+        client.payment_status = 'none'
         client.subscription_end_date = timezone.now()
         client.save()
         
@@ -664,7 +492,8 @@ def cancel_subscription(request):
             'success': True,
             'message': 'Subscription cancelled successfully',
             'cancelled_at': timezone.now(),
-            'reason': reason
+            'reason': reason,
+            'cancelled_immediately': True
         })
         
     except Exception as e:
@@ -674,112 +503,21 @@ def cancel_subscription(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def update_subscription_plan(request):
-    """Update/upgrade the current subscription plan"""
+def create_order(request):
+    """Create a one-time PayPal order"""
     try:
-        new_plan_id = request.data.get('plan_id')
+        amount = request.data.get('amount')
+        description = request.data.get('description', 'Service Payment')
+        invoice_id = request.data.get('invoice_id')
         
-        if not new_plan_id or new_plan_id not in PAYPAL_PLANS:
+        if not amount:
             return Response(
-                {'error': 'Invalid plan selected'},
+                {'error': 'Amount is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Get the client profile
-        try:
-            client = Client.objects.get(user=request.user)
-        except Client.DoesNotExist:
-            return Response(
-                {'error': 'No client profile found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        if not client.paypal_subscription_id:
-            return Response(
-                {'error': 'No active subscription found. Please create a new subscription.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        new_plan = PAYPAL_PLANS[new_plan_id]
-        paypal_client = PayPalAPIClient()
-        
-        # Update subscription plan in PayPal
-        update_data = {
-            "plan_id": new_plan['paypal_plan_id'],
-            "shipping_amount": {
-                "currency_code": "USD",
-                "value": "0.00"
-            },
-            "shipping_address": {
-                "name": {
-                    "full_name": f"{request.user.first_name} {request.user.last_name}"
-                },
-                "address": {
-                    "address_line_1": "N/A",
-                    "admin_area_2": "N/A", 
-                    "admin_area_1": "N/A",
-                    "postal_code": "00000",
-                    "country_code": "US"
-                }
-            }
-        }
-        
-        response = paypal_client.make_request(
-            'POST',
-            f'/v1/billing/subscriptions/{client.paypal_subscription_id}/revise',
-            update_data
-        )
-        
-        # Update local client record
-        client.current_plan = new_plan_id
-        client.monthly_fee = new_plan['price']
-        client.save()
-        
-        logger.info(f"Subscription plan updated to {new_plan_id} for user {request.user.id}")
-        
-        return Response({
-            'success': True,
-            'message': f'Subscription updated to {new_plan["name"]}',
-            'new_plan': {
-                'id': new_plan_id,
-                'name': new_plan['name'],
-                'price': new_plan['price'],
-                'features': new_plan['features']
-            },
-            'updated_at': timezone.now()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error updating subscription plan: {e}")
-        return Response(
-            {'error': 'Failed to update subscription plan'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-# ============ STUB FUNCTIONS FOR FRONTEND COMPATIBILITY ============
-# These functions provide compatibility with the frontend but return
-# appropriate responses indicating PayPal limitations
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def pay_invoice_stub(request, invoice_id):
-    """Stub for paying invoices - redirects to PayPal one-time payment"""
-    try:
-        # Get invoice details from the database
-        from ..models import Invoice
-        try:
-            invoice = Invoice.objects.get(id=invoice_id, client__user=request.user)
-        except Invoice.DoesNotExist:
-            return Response(
-                {'error': 'Invoice not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Create a PayPal order for the invoice amount
         paypal_client = PayPalAPIClient()
         
         order_data = {
@@ -787,21 +525,24 @@ def pay_invoice_stub(request, invoice_id):
             "purchase_units": [{
                 "amount": {
                     "currency_code": "USD",
-                    "value": str(float(invoice.amount))
+                    "value": str(amount)
                 },
-                "description": f"Invoice #{invoice.id}",
-                "invoice_id": str(invoice.id)
+                "description": description
             }],
             "application_context": {
-                "brand_name": "VisionBoost",
+                "brand_name": "VisionBoost Agency",
                 "locale": "en-US",
                 "landing_page": "BILLING",
                 "shipping_preference": "NO_SHIPPING",
                 "user_action": "PAY_NOW",
-                "return_url": f"{settings.FRONTEND_URL}/payment/success?invoice={invoice.id}",
-                "cancel_url": f"{settings.FRONTEND_URL}/payment/cancel"
+                "return_url": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/payment/success",
+                "cancel_url": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/payment/cancel"
             }
         }
+        
+        # Add invoice reference if provided
+        if invoice_id:
+            order_data["purchase_units"][0]["invoice_id"] = str(invoice_id)
         
         order = paypal_client.make_request('POST', '/v2/checkout/orders', order_data)
         
@@ -812,12 +553,187 @@ def pay_invoice_stub(request, invoice_id):
                 approval_url = link.get('href')
                 break
         
+        if not approval_url:
+            raise Exception("No approval URL found in PayPal response")
+        
+        logger.info(f"Created PayPal order {order['id']} for user {request.user.id}")
+        
         return Response({
             'order_id': order['id'],
             'approval_url': approval_url,
-            'amount': float(invoice.amount),
-            'invoice_id': str(invoice.id)
+            'status': order.get('status', 'CREATED'),
+            'amount': amount,
+            'description': description,
+            'invoice_number': invoice_id
         })
+        
+    except Exception as e:
+        logger.error(f"Error creating order: {e}")
+        return Response(
+            {'error': 'Failed to create order'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def capture_payment(request):
+    """Capture a PayPal payment"""
+    try:
+        order_id = request.data.get('order_id')
+        
+        if not order_id:
+            return Response(
+                {'error': 'Order ID is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        paypal_client = PayPalAPIClient()
+        
+        # Capture the payment
+        capture = paypal_client.make_request('POST', f'/v2/checkout/orders/{order_id}/capture')
+        
+        if capture.get('status') == 'COMPLETED':
+            # Update invoice status if this was for an invoice
+            purchase_units = capture.get('purchase_units', [])
+            if purchase_units:
+                invoice_id = purchase_units[0].get('invoice_id')
+                if invoice_id:
+                    try:
+                        from ..models import Invoice
+                        invoice = Invoice.objects.get(id=invoice_id)
+                        invoice.status = 'paid'
+                        invoice.paid_at = timezone.now()
+                        invoice.save()
+                        
+                        # Update client's total spent
+                        invoice.client.total_spent += invoice.amount
+                        invoice.client.payment_status = 'paid'
+                        invoice.client.save()
+                        
+                        logger.info(f"Invoice {invoice_id} marked as paid via PayPal order {order_id}")
+                    except Exception as e:
+                        logger.error(f"Error updating invoice {invoice_id}: {e}")
+            
+            logger.info(f"Payment captured for order {order_id}, user {request.user.id}")
+            
+            return Response({
+                'success': True,
+                'order_id': order_id,
+                'status': 'COMPLETED',
+                'message': 'Payment captured successfully'
+            })
+        else:
+            return Response(
+                {'error': f'Payment capture failed. Status: {capture.get("status")}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+    except Exception as e:
+        logger.error(f"Error capturing payment: {e}")
+        return Response(
+            {'error': 'Failed to capture payment'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@method_decorator(csrf_exempt, name='dispatch')
+@api_view(['POST'])
+def paypal_webhook(request):
+    """Handle PayPal webhooks"""
+    try:
+        webhook_data = json.loads(request.body)
+        event_type = webhook_data.get('event_type')
+        
+        logger.info(f"Received PayPal webhook: {event_type}")
+        
+        if event_type == 'BILLING.SUBSCRIPTION.ACTIVATED':
+            # Handle subscription activation
+            subscription = webhook_data.get('resource', {})
+            subscription_id = subscription.get('id')
+            
+            try:
+                client = Client.objects.get(paypal_subscription_id=subscription_id)
+                client.status = 'active'
+                client.payment_status = 'paid'
+                
+                if not client.subscription_start_date:
+                    client.subscription_start_date = timezone.now()
+                
+                client.save()
+                logger.info(f"Subscription {subscription_id} activated via webhook for client {client.id}")
+            except Client.DoesNotExist:
+                logger.warning(f"Client not found for subscription {subscription_id}")
+            
+        elif event_type == 'BILLING.SUBSCRIPTION.CANCELLED':
+            subscription = webhook_data.get('resource', {})
+            subscription_id = subscription.get('id')
+            
+            try:
+                client = Client.objects.get(paypal_subscription_id=subscription_id)
+                client.status = 'cancelled'
+                client.payment_status = 'none'
+                client.subscription_end_date = timezone.now()
+                client.save()
+                logger.info(f"Subscription {subscription_id} cancelled via webhook for client {client.id}")
+            except Client.DoesNotExist:
+                logger.warning(f"Client not found for subscription {subscription_id}")
+        
+        elif event_type == 'PAYMENT.SALE.COMPLETED':
+            sale = webhook_data.get('resource', {})
+            billing_agreement_id = sale.get('billing_agreement_id')
+            
+            if billing_agreement_id:
+                try:
+                    client = Client.objects.get(paypal_subscription_id=billing_agreement_id)
+                    client.payment_status = 'paid'
+                    client.total_spent += Decimal(sale.get('amount', {}).get('total', 0))
+                    
+                    # Update next payment date
+                    from dateutil.relativedelta import relativedelta
+                    if client.next_payment:
+                        client.next_payment = client.next_payment + relativedelta(months=1)
+                    
+                    client.save()
+                    logger.info(f"Payment completed via webhook for client {client.id}")
+                except Client.DoesNotExist:
+                    logger.warning(f"Client not found for billing agreement {billing_agreement_id}")
+        
+        return JsonResponse({'status': 'success'})
+        
+    except Exception as e:
+        logger.error(f"Error processing PayPal webhook: {e}")
+        return JsonResponse({'error': 'Webhook processing failed'}, status=500)
+
+# ============ STUB FUNCTIONS FOR FRONTEND COMPATIBILITY ============
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def pay_invoice_stub(request, invoice_id):
+    """Stub for paying invoices - redirects to PayPal one-time payment"""
+    try:
+        from ..models import Invoice
+        try:
+            invoice = Invoice.objects.get(id=invoice_id, client__user=request.user)
+        except Invoice.DoesNotExist:
+            return Response(
+                {'error': 'Invoice not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Use the create_order endpoint
+        order_data = {
+            'amount': float(invoice.amount),
+            'description': f"Invoice #{invoice.invoice_number}",
+            'invoice_id': str(invoice.id)
+        }
+        
+        # Call create_order internally
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        order_request = factory.post('/api/billing/create-order/', order_data)
+        order_request.user = request.user
+        
+        response = create_order(order_request)
+        return response
         
     except Exception as e:
         logger.error(f"Error creating invoice payment: {e}")
@@ -825,7 +741,6 @@ def pay_invoice_stub(request, invoice_id):
             {'error': 'Failed to create payment for invoice'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -837,7 +752,6 @@ def get_payment_methods_stub(request):
         'provider': 'paypal'
     })
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_setup_intent_stub(request):
@@ -846,7 +760,6 @@ def create_setup_intent_stub(request):
         'error': 'PayPal does not support setup intents. Use direct payment or subscription flows.',
         'provider': 'paypal'
     }, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -857,7 +770,6 @@ def set_default_payment_method_stub(request, payment_method_id):
         'provider': 'paypal'
     }, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_payment_method_stub(request, payment_method_id):
@@ -867,12 +779,11 @@ def delete_payment_method_stub(request, payment_method_id):
         'provider': 'paypal'
     }, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_admin_billing_settings_stub(request):
     """Stub for admin billing settings"""
-    if not request.user.is_staff:
+    if not request.user.is_staff and request.user.role != 'admin':
         return Response(
             {'error': 'Admin access required'},
             status=status.HTTP_403_FORBIDDEN
@@ -881,20 +792,19 @@ def get_admin_billing_settings_stub(request):
     return Response({
         'provider': 'paypal',
         'settings': {
-            'paypal_client_id': settings.PAYPAL_CLIENT_ID,
-            'paypal_environment': 'sandbox' if 'sandbox' in settings.PAYPAL_BASE_URL else 'live',
-            'webhook_url': f"{settings.BACKEND_URL}/api/billing/webhook/",
+            'paypal_client_id': getattr(settings, 'PAYPAL_CLIENT_ID', ''),
+            'paypal_environment': 'sandbox' if 'sandbox' in getattr(settings, 'PAYPAL_BASE_URL', '') else 'live',
+            'webhook_url': f"{getattr(settings, 'BACKEND_URL', 'http://localhost:8000')}/api/billing/webhook/",
             'plans_configured': len(PAYPAL_PLANS),
             'available_plans': list(PAYPAL_PLANS.keys())
         }
     })
 
-
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_admin_account_stub(request):
     """Stub for deleting admin account"""
-    if not request.user.is_staff:
+    if not request.user.is_staff and request.user.role != 'admin':
         return Response(
             {'error': 'Admin access required'},
             status=status.HTTP_403_FORBIDDEN
@@ -904,3 +814,12 @@ def delete_admin_account_stub(request):
         'error': 'Account deletion must be performed manually for security reasons.',
         'message': 'Please contact system administrator for account deletion.'
     }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_subscription_plan(request):
+    """Update/upgrade the current subscription plan"""
+    return Response({
+        'error': 'Plan updates not yet implemented. Please cancel current subscription and create a new one.',
+        'message': 'This feature will be available in a future update.'
+    }, status=status.HTTP_501_NOT_IMPLEMENTED)

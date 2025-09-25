@@ -42,13 +42,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 name=name,
                 email=validated_data['email'],
                 company=validated_data.get('company', ''),
-                package='No Plan',  # Changed from 'Basic Package'
-                monthly_fee=0,  # Changed from 1500
+                package='No Plan Selected',  # Changed from 'Basic Package'
+                monthly_fee=0,  # No fee until they select a plan
                 start_date=timezone.now().date(),
-                status='pending',  # Keep as pending until they choose a plan
-                payment_status='pending',  # No payment required yet
+                status='pending',  # Pending until they choose a plan
+                payment_status='none',  # No payment required yet
                 account_manager='Admin',
-                next_payment=timezone.now().date() + timezone.timedelta(days=30)
+                next_payment=None,  # No payment scheduled
+                current_plan=None,  # No plan selected
+                paypal_subscription_id=None,  # No PayPal subscription
+                paypal_customer_id=None,  # No PayPal customer
             )
         
         return user
