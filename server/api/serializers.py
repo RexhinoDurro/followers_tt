@@ -18,7 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """User registration serializer - FIXED to not auto-create subscriptions"""
+    """User registration serializer - FIXED to always create client profiles"""
     password = serializers.CharField(write_only=True, min_length=8)
     name = serializers.CharField(write_only=True)
 
@@ -35,24 +35,31 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         
         user = User.objects.create_user(**validated_data)
         
-        # Create client profile if role is client - BUT NO SUBSCRIPTION
-        if validated_data.get('role') == 'client':
+        # ALWAYS create client profile for any user (even if role is admin, they might need billing)
+        # This ensures every user has a client profile for billing purposes
+        try:
+            from django.utils import timezone
             Client.objects.create(
                 user=user,
                 name=name,
                 email=validated_data['email'],
-                company=validated_data.get('company', ''),
-                package='No Plan Selected',  # Changed from 'Basic Package'
-                monthly_fee=0,  # No fee until they select a plan
+                company=validated_data.get('company', '') or 'Unknown Company',
+                package='No Plan Selected',
+                monthly_fee=0,
                 start_date=timezone.now().date(),
-                status='pending',  # Pending until they choose a plan
-                payment_status='none',  # No payment required yet
+                status='pending',
+                payment_status='none',
                 account_manager='Admin',
-                next_payment=None,  # No payment scheduled
-                current_plan=None,  # No plan selected
-                paypal_subscription_id=None,  # No PayPal subscription
-                paypal_customer_id=None,  # No PayPal customer
+                next_payment=None,
+                current_plan='none',
+                paypal_subscription_id=None,
+                paypal_customer_id=None,
             )
+            print(f"Created client profile for new user: {user.email}")
+        except Exception as e:
+            print(f"ERROR: Failed to create client profile for {user.email}: {e}")
+            # Don't fail registration if client profile creation fails
+            pass
         
         return user
 

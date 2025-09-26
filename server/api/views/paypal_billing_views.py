@@ -18,6 +18,32 @@ from ..models import Client, Invoice
 
 logger = logging.getLogger(__name__)
 
+def ensure_client_profile(user):
+    """Ensure a client profile exists for the user"""
+    try:
+        client = Client.objects.get(user=user)
+        return client
+    except Client.DoesNotExist:
+        # Create a client profile if it doesn't exist
+        client = Client.objects.create(
+            user=user,
+            name=f"{user.first_name} {user.last_name}".strip() or user.username,
+            email=user.email,
+            company=getattr(user, 'company', '') or 'Unknown Company',
+            package='No Plan Selected',
+            monthly_fee=0,
+            start_date=timezone.now().date(),
+            status='pending',
+            payment_status='none',
+            account_manager='Admin',
+            next_payment=None,
+            current_plan='none',
+            paypal_subscription_id=None,
+            paypal_customer_id=None,
+        )
+        logger.info(f"Created missing client profile for user {user.id}")
+        return client
+
 # SERVER-BASED PLAN CONFIGURATION - No PayPal Plan IDs needed
 SERVER_PLANS = {
     'starter': {
@@ -150,22 +176,8 @@ def get_available_plans(request):
 def get_current_subscription(request):
     """Get current subscription details (server-managed)"""
     try:
-        try:
-            client = Client.objects.get(user=request.user)
-        except Client.DoesNotExist:
-            return Response({
-                'plan': 'none',
-                'planId': 'none',
-                'price': 0,
-                'billing_cycle': 'monthly',
-                'next_billing_date': None,
-                'features': [],
-                'status': 'none',
-                'subscriptionId': None,
-                'can_cancel': False,
-                'payment_method': 'paypal_orders',
-                'server_managed': True
-            })
+        # Ensure client profile exists
+        client = ensure_client_profile(request.user)
         
         # If no current plan selected
         if not client.current_plan or client.current_plan == 'none':
@@ -228,52 +240,44 @@ def approve_subscription(request):
         
         if capture_response.get('status') == 'COMPLETED':
             # Activate subscription locally
-            try:
-                client = Client.objects.get(user=request.user)
+            client = ensure_client_profile(request.user)
+            
+            # Update client subscription details
+            client.status = 'active'
+            client.payment_status = 'paid'
+            client.subscription_start_date = timezone.now()
+            client.next_payment = timezone.now().date() + timedelta(days=30)
+            
+            # Create invoice record for first payment
+            purchase_units = capture_response.get('purchase_units', [])
+            if purchase_units:
+                amount = Decimal(purchase_units[0].get('amount', {}).get('value', '0'))
                 
-                # Update client subscription details
-                client.status = 'active'
-                client.payment_status = 'paid'
-                client.subscription_start_date = timezone.now()
-                client.next_payment = timezone.now().date() + timedelta(days=30)
-                
-                # Create invoice record for first payment
-                purchase_units = capture_response.get('purchase_units', [])
-                if purchase_units:
-                    amount = Decimal(purchase_units[0].get('amount', {}).get('value', '0'))
-                    
-                    Invoice.objects.create(
-                        client=client,
-                        invoice_number=f"SUB-{order_id[:8].upper()}",
-                        amount=amount,
-                        due_date=timezone.now().date(),
-                        status='paid',
-                        paid_at=timezone.now(),
-                        description=f"Monthly subscription - {client.package}"
-                    )
-                    
-                    client.total_spent += amount
-                
-                client.save()
-                
-                logger.info(f"Subscription activated for user {request.user.id} with order {order_id}")
-                
-                return Response({
-                    'success': True,
-                    'subscription_id': f"server_{client.id}_{client.current_plan}",
-                    'status': 'ACTIVE',
-                    'message': 'Subscription activated successfully',
-                    'plan': client.current_plan,
-                    'monthly_fee': float(client.monthly_fee),
-                    'next_billing_date': client.next_payment.isoformat()
-                })
-                
-            except Client.DoesNotExist:
-                logger.error(f"Client profile not found for user {request.user.id}")
-                return Response(
-                    {'error': 'Client profile not found'},
-                    status=status.HTTP_404_NOT_FOUND
+                Invoice.objects.create(
+                    client=client,
+                    invoice_number=f"SUB-{order_id[:8].upper()}",
+                    amount=amount,
+                    due_date=timezone.now().date(),
+                    status='paid',
+                    paid_at=timezone.now(),
+                    description=f"Monthly subscription - {client.package}"
                 )
+                
+                client.total_spent += amount
+            
+            client.save()
+            
+            logger.info(f"Subscription activated for user {request.user.id} with order {order_id}")
+            
+            return Response({
+                'success': True,
+                'subscription_id': f"server_{client.id}_{client.current_plan}",
+                'status': 'ACTIVE',
+                'message': 'Subscription activated successfully',
+                'plan': client.current_plan,
+                'monthly_fee': float(client.monthly_fee),
+                'next_billing_date': client.next_payment.isoformat()
+            })
         else:
             return Response(
                 {'error': f'Payment capture failed. Status: {capture_response.get("status")}'},
@@ -307,6 +311,9 @@ def create_subscription(request):
                 {'error': 'Invalid plan selected'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Ensure client profile exists (CREATE IF MISSING)
+        client = ensure_client_profile(request.user)
         
         # Create PayPal order for first payment
         paypal_client = PayPalAPIClient()
@@ -346,15 +353,11 @@ def create_subscription(request):
             raise Exception("No approval URL found in PayPal response")
         
         # Store pending subscription info in client record
-        try:
-            client = Client.objects.get(user=request.user)
-            client.package = plan_data['name']
-            client.monthly_fee = plan_data['price']
-            client.current_plan = plan_data['id']
-            client.status = 'pending'  # Will be activated after payment
-            client.save()
-        except Client.DoesNotExist:
-            logger.error(f"Client profile not found for user {request.user.id}")
+        client.package = plan_data['name']
+        client.monthly_fee = plan_data['price']
+        client.current_plan = plan_data['id']
+        client.status = 'pending'  # Will be activated after payment
+        client.save()
         
         logger.info(f"Created PayPal order {order['id']} for subscription {plan_data['name']} - user {request.user.id}")
         
@@ -380,13 +383,8 @@ def create_subscription(request):
 def cancel_subscription(request):
     """Cancel the current server-managed subscription"""
     try:
-        try:
-            client = Client.objects.get(user=request.user)
-        except Client.DoesNotExist:
-            return Response(
-                {'error': 'No client profile found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Ensure client profile exists
+        client = ensure_client_profile(request.user)
         
         if client.status != 'active':
             return Response(
@@ -626,9 +624,11 @@ def paypal_webhook(request):
 def pay_invoice_stub(request, invoice_id):
     """Stub for paying invoices - redirects to PayPal one-time payment"""
     try:
-        from ..models import Invoice
+        # Ensure client profile exists
+        client = ensure_client_profile(request.user)
+        
         try:
-            invoice = Invoice.objects.get(id=invoice_id, client__user=request.user)
+            invoice = Invoice.objects.get(id=invoice_id, client=client)
         except Invoice.DoesNotExist:
             return Response(
                 {'error': 'Invoice not found'},
