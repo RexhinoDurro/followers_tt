@@ -39,6 +39,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # This ensures every user has a client profile for billing purposes
         try:
             from django.utils import timezone
+            from datetime import timedelta
+            future_date = timezone.now().date() + timedelta(days=30)
+            
             Client.objects.create(
                 user=user,
                 name=name,
@@ -50,7 +53,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 status='pending',
                 payment_status='none',
                 account_manager='Admin',
-                next_payment=None,
+                next_payment=future_date,  # Use future date instead of None
                 current_plan='none',
                 paypal_subscription_id=None,
                 paypal_customer_id=None,

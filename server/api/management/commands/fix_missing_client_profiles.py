@@ -35,6 +35,10 @@ class Command(BaseCommand):
                 self.stdout.write(f"Would create profile for: {user.email} ({user.first_name} {user.last_name})")
             else:
                 try:
+                    # Set next_payment to a future date instead of None
+                    from datetime import timedelta
+                    future_date = timezone.now().date() + timedelta(days=30)
+                    
                     client = Client.objects.create(
                         user=user,
                         name=f"{user.first_name} {user.last_name}".strip() or user.username,
@@ -46,7 +50,7 @@ class Command(BaseCommand):
                         status='pending',
                         payment_status='none',
                         account_manager='Admin',
-                        next_payment=None,
+                        next_payment=future_date,  # Use future date instead of None
                         current_plan='none',
                         paypal_subscription_id=None,
                         paypal_customer_id=None,
