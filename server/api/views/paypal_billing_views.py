@@ -1,8 +1,8 @@
-# api/views/paypal_billing_views.py - Updated with proper subscription flow
+# server/api/views/paypal_billing_views.py - Updated for server-based plans
 import logging
 import json
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -14,55 +14,55 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 import requests
 import dateutil.parser
-from ..models import Client
+from ..models import Client, Invoice
 
 logger = logging.getLogger(__name__)
 
-# PayPal Plan Configuration - UPDATED with English translations
-PAYPAL_PLANS = {
+# SERVER-BASED PLAN CONFIGURATION - No PayPal Plan IDs needed
+SERVER_PLANS = {
     'starter': {
         'id': 'starter',
         'name': 'Starter Plan',
-        'price': 100,  # $100/month (100€ converted)
-        'paypal_plan_id': getattr(settings, 'PAYPAL_STARTER_PLAN_ID', ''),
+        'price': 100,  # $100/month
         'features': [
             '12 posts (photos/reels)',
             '12 interactive stories', 
             'Organic growth and hashtag research',
             'Monthly growth reports and statistics',
             'Ideal for small businesses'
-        ]
+        ],
+        'billing_cycle': 'monthly'
     },
     'pro': {
         'id': 'pro', 
         'name': 'Pro Plan',
-        'price': 250,  # $250/month (250€ converted)
-        'paypal_plan_id': getattr(settings, 'PAYPAL_PRO_PLAN_ID', ''),
+        'price': 250,  # $250/month
         'features': [
             '20 posts + reels',
             'Advanced promotional campaigns',
             'Growth strategy and blog optimization',
             'Enhanced reports and recommendations',
             'Aggressive growth strategies'
-        ]
+        ],
+        'billing_cycle': 'monthly'
     },
     'premium': {
         'id': 'premium',
         'name': 'Premium Plan', 
-        'price': 400,  # $400/month (400€ converted)
-        'paypal_plan_id': getattr(settings, 'PAYPAL_PREMIUM_PLAN_ID', ''),
+        'price': 400,  # $400/month
         'features': [
             'Instagram + Facebook + TikTok',
             '30+ posts (design, reels, carousel)',
             'Premium advertising with budget allocation',
             'Professional management and plotting',
             'Full-service social media management'
-        ]
+        ],
+        'billing_cycle': 'monthly'
     }
 }
 
 class PayPalAPIClient:
-    """PayPal API client for handling authentication and requests"""
+    """Simplified PayPal API client for one-time payments only"""
     
     def __init__(self):
         self.client_id = getattr(settings, 'PAYPAL_CLIENT_ID', '')
@@ -112,29 +112,31 @@ class PayPalAPIClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"PayPal API request failed: {e}")
-            if hasattr(e.response, 'text'):
+            if hasattr(e, 'response') and e.response:
                 logger.error(f"Response: {e.response.text}")
             raise
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_available_plans(request):
-    """Get available subscription plans"""
+    """Get available subscription plans (server-based)"""
     try:
         plans = []
-        for plan_id, plan_data in PAYPAL_PLANS.items():
+        for plan_id, plan_data in SERVER_PLANS.items():
             plans.append({
                 'id': plan_data['id'],
                 'name': plan_data['name'],
                 'price': plan_data['price'],
                 'features': plan_data['features'],
+                'billing_cycle': plan_data['billing_cycle'],
                 'recommended': plan_id == 'pro'  # Mark Pro as recommended
             })
         
         return Response({
             'plans': plans,
             'currency': 'USD',
-            'billing_cycle': 'monthly'
+            'billing_type': 'server_managed',
+            'payment_method': 'paypal_orders'
         })
     except Exception as e:
         logger.error(f"Error getting available plans: {e}")
@@ -146,9 +148,8 @@ def get_available_plans(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_current_subscription(request):
-    """Get current subscription details for the authenticated user"""
+    """Get current subscription details (server-managed)"""
     try:
-        # Get the client profile for the current user
         try:
             client = Client.objects.get(user=request.user)
         except Client.DoesNotExist:
@@ -162,13 +163,11 @@ def get_current_subscription(request):
                 'status': 'none',
                 'subscriptionId': None,
                 'can_cancel': False,
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': False,
-                'message': 'No client profile found'
+                'payment_method': 'paypal_orders',
+                'server_managed': True
             })
         
-        # If no current plan or plan is 'none', return basic info
+        # If no current plan selected
         if not client.current_plan or client.current_plan == 'none':
             return Response({
                 'plan': 'none',
@@ -180,89 +179,27 @@ def get_current_subscription(request):
                 'status': 'none',
                 'subscriptionId': None,
                 'can_cancel': False,
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': False
+                'payment_method': 'paypal_orders',
+                'server_managed': True
             })
         
-        # Get plan details
-        plan_details = PAYPAL_PLANS.get(client.current_plan, {})
+        # Get plan details from server configuration
+        plan_details = SERVER_PLANS.get(client.current_plan, {})
         
-        # If no PayPal subscription ID, return local data
-        if not client.paypal_subscription_id:
-            return Response({
-                'plan': client.current_plan,
-                'planId': client.current_plan,
-                'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
-                'billing_cycle': 'monthly',
-                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
-                'features': plan_details.get('features', []),
-                'status': 'inactive',
-                'subscriptionId': None,
-                'can_cancel': False,
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': False
-            })
-        
-        # Fetch current subscription details from PayPal
-        paypal_client = PayPalAPIClient()
-        
-        try:
-            subscription = paypal_client.make_request(
-                'GET', 
-                f'/v1/billing/subscriptions/{client.paypal_subscription_id}'
-            )
-            
-            # Extract billing info
-            billing_info = subscription.get('billing_info', {})
-            next_billing_time = billing_info.get('next_billing_time')
-            
-            subscription_data = {
-                'plan': client.current_plan,
-                'planId': client.current_plan,
-                'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
-                'billing_cycle': 'monthly',
-                'next_billing_date': next_billing_time,
-                'features': plan_details.get('features', []),
-                'status': 'active' if subscription.get('status') == 'ACTIVE' else subscription.get('status', '').lower(),
-                'subscriptionId': subscription.get('id'),
-                'can_cancel': subscription.get('status') == 'ACTIVE',
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': subscription.get('status') == 'ACTIVE',
-                'subscriber_info': {
-                    'name': subscription.get('subscriber', {}).get('name', {}),
-                    'email': subscription.get('subscriber', {}).get('email_address')
-                },
-                'paypal_details': {
-                    'plan_id': subscription.get('plan_id'),
-                    'create_time': subscription.get('create_time'),
-                    'update_time': subscription.get('update_time'),
-                    'status_update_time': subscription.get('status_update_time')
-                }
-            }
-            
-            return Response(subscription_data)
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch subscription from PayPal: {e}")
-            # Return local data if PayPal API fails
-            return Response({
-                'plan': client.current_plan,
-                'planId': client.current_plan,
-                'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
-                'billing_cycle': 'monthly',
-                'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
-                'features': plan_details.get('features', []),
-                'status': 'unknown',
-                'subscriptionId': client.paypal_subscription_id,
-                'can_cancel': True,
-                'cancel_at_period_end': False,
-                'payment_method': 'paypal',
-                'auto_renewal': False,
-                'error': 'Could not fetch latest status from PayPal'
-            })
+        return Response({
+            'plan': client.current_plan,
+            'planId': client.current_plan,
+            'price': float(client.monthly_fee) if client.monthly_fee else plan_details.get('price', 0),
+            'billing_cycle': 'monthly',
+            'next_billing_date': client.next_payment.isoformat() if client.next_payment else None,
+            'features': plan_details.get('features', []),
+            'status': client.status,
+            'subscriptionId': f"server_{client.id}",  # Server-generated ID
+            'can_cancel': client.status == 'active',
+            'payment_method': 'paypal_orders',
+            'server_managed': True,
+            'auto_renewal': client.status == 'active'
+        })
             
     except Exception as e:
         logger.error(f"Error getting current subscription: {e}")
@@ -274,65 +211,62 @@ def get_current_subscription(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def approve_subscription(request):
-    """Approve and activate a PayPal subscription"""
+    """Approve and activate a server-managed subscription"""
     try:
-        subscription_id = request.data.get('subscription_id')
+        order_id = request.data.get('order_id')  # Use order_id instead of subscription_id
         
-        if not subscription_id:
+        if not order_id:
             return Response(
-                {'error': 'Subscription ID is required'},
+                {'error': 'Order ID is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         paypal_client = PayPalAPIClient()
         
-        # Get subscription details
-        subscription = paypal_client.make_request('GET', f'/v1/billing/subscriptions/{subscription_id}')
+        # Capture the payment
+        capture_response = paypal_client.make_request('POST', f'/v2/checkout/orders/{order_id}/capture')
         
-        if subscription.get('status') == 'ACTIVE':
-            # Update user's subscription in database
+        if capture_response.get('status') == 'COMPLETED':
+            # Activate subscription locally
             try:
                 client = Client.objects.get(user=request.user)
                 
-                # Find the plan based on PayPal plan ID
-                plan_id = subscription.get('plan_id', '')
-                current_plan = None
-                monthly_fee = 0
-                
-                for plan_key, plan_data in PAYPAL_PLANS.items():
-                    if plan_data['paypal_plan_id'] == plan_id:
-                        current_plan = plan_key
-                        monthly_fee = plan_data['price']
-                        break
-                
                 # Update client subscription details
-                client.paypal_subscription_id = subscription_id
-                client.current_plan = current_plan or 'starter'  # Default to starter if not found
-                client.monthly_fee = monthly_fee
                 client.status = 'active'
                 client.payment_status = 'paid'
                 client.subscription_start_date = timezone.now()
-                client.package = PAYPAL_PLANS.get(current_plan, {}).get('name', 'Unknown Plan')
+                client.next_payment = timezone.now().date() + timedelta(days=30)
                 
-                # Get subscriber info
-                subscriber = subscription.get('subscriber', {})
-                if subscriber.get('payer_id'):
-                    client.paypal_customer_id = subscriber['payer_id']
-                
-                # Set next payment date based on billing info
-                billing_info = subscription.get('billing_info', {})
-                if billing_info.get('next_billing_time'):
-                    client.next_payment = dateutil.parser.parse(
-                        billing_info['next_billing_time']
-                    ).date()
-                else:
-                    # Default to 1 month from now
-                    from datetime import timedelta
-                    client.next_payment = timezone.now().date() + timedelta(days=30)
+                # Create invoice record for first payment
+                purchase_units = capture_response.get('purchase_units', [])
+                if purchase_units:
+                    amount = Decimal(purchase_units[0].get('amount', {}).get('value', '0'))
+                    
+                    Invoice.objects.create(
+                        client=client,
+                        invoice_number=f"SUB-{order_id[:8].upper()}",
+                        amount=amount,
+                        due_date=timezone.now().date(),
+                        status='paid',
+                        paid_at=timezone.now(),
+                        description=f"Monthly subscription - {client.package}"
+                    )
+                    
+                    client.total_spent += amount
                 
                 client.save()
                 
-                logger.info(f"Subscription {subscription_id} activated for user {request.user.id}")
+                logger.info(f"Subscription activated for user {request.user.id} with order {order_id}")
+                
+                return Response({
+                    'success': True,
+                    'subscription_id': f"server_{client.id}_{client.current_plan}",
+                    'status': 'ACTIVE',
+                    'message': 'Subscription activated successfully',
+                    'plan': client.current_plan,
+                    'monthly_fee': float(client.monthly_fee),
+                    'next_billing_date': client.next_payment.isoformat()
+                })
                 
             except Client.DoesNotExist:
                 logger.error(f"Client profile not found for user {request.user.id}")
@@ -340,20 +274,9 @@ def approve_subscription(request):
                     {'error': 'Client profile not found'},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            except Exception as e:
-                logger.error(f"Error updating client subscription: {e}")
-            
-            return Response({
-                'success': True,
-                'subscription_id': subscription_id,
-                'status': 'ACTIVE',
-                'message': 'Subscription activated successfully',
-                'plan': current_plan,
-                'monthly_fee': monthly_fee
-            })
         else:
             return Response(
-                {'error': f'Subscription is not active. Status: {subscription.get("status")}'},
+                {'error': f'Payment capture failed. Status: {capture_response.get("status")}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -367,14 +290,14 @@ def approve_subscription(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_subscription(request):
-    """Create a PayPal subscription"""
+    """Create a server-managed subscription with PayPal payment"""
     try:
         plan_name = request.data.get('plan_name')
         price_id = request.data.get('price_id', '').replace('price_', '').replace('_monthly', '')
         
-        # Find the plan
+        # Find the plan in server configuration
         plan_data = None
-        for plan_id, plan in PAYPAL_PLANS.items():
+        for plan_id, plan in SERVER_PLANS.items():
             if plan_id == price_id or plan['name'] == plan_name:
                 plan_data = plan
                 break
@@ -385,43 +308,36 @@ def create_subscription(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if not plan_data.get('paypal_plan_id'):
-            return Response(
-                {'error': f'PayPal plan ID not configured for {plan_data["name"]}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+        # Create PayPal order for first payment
         paypal_client = PayPalAPIClient()
         
-        # Create subscription
-        subscription_data = {
-            "plan_id": plan_data['paypal_plan_id'],
-            "subscriber": {
-                "name": {
-                    "given_name": request.user.first_name or "Customer",
-                    "surname": request.user.last_name or "User"
-                },
-                "email_address": request.user.email
-            },
+        order_data = {
+            "intent": "CAPTURE",
+            "purchase_units": [{
+                "reference_id": f"subscription_{request.user.id}_{plan_data['id']}",
+                "description": f"{plan_data['name']} - Monthly Subscription",
+                "custom_id": str(request.user.id),
+                "amount": {
+                    "currency_code": "USD",
+                    "value": str(plan_data['price'])
+                }
+            }],
             "application_context": {
                 "brand_name": "VisionBoost Agency",
                 "locale": "en-US",
+                "landing_page": "BILLING",
                 "shipping_preference": "NO_SHIPPING",
-                "user_action": "SUBSCRIBE_NOW",
-                "payment_method": {
-                    "payer_selected": "PAYPAL",
-                    "payee_preferred": "IMMEDIATE_PAYMENT_REQUIRED"
-                },
+                "user_action": "PAY_NOW",
                 "return_url": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/billing/success",
                 "cancel_url": f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/billing/cancel"
             }
         }
         
-        subscription = paypal_client.make_request('POST', '/v1/billing/subscriptions', subscription_data)
+        order = paypal_client.make_request('POST', '/v2/checkout/orders', order_data)
         
         # Find approval URL
         approval_url = None
-        for link in subscription.get('links', []):
+        for link in order.get('links', []):
             if link.get('rel') == 'approve':
                 approval_url = link.get('href')
                 break
@@ -429,14 +345,27 @@ def create_subscription(request):
         if not approval_url:
             raise Exception("No approval URL found in PayPal response")
         
-        logger.info(f"Created PayPal subscription {subscription['id']} for user {request.user.id}")
+        # Store pending subscription info in client record
+        try:
+            client = Client.objects.get(user=request.user)
+            client.package = plan_data['name']
+            client.monthly_fee = plan_data['price']
+            client.current_plan = plan_data['id']
+            client.status = 'pending'  # Will be activated after payment
+            client.save()
+        except Client.DoesNotExist:
+            logger.error(f"Client profile not found for user {request.user.id}")
+        
+        logger.info(f"Created PayPal order {order['id']} for subscription {plan_data['name']} - user {request.user.id}")
         
         return Response({
-            'subscription_id': subscription['id'],
+            'subscription_id': f"server_{request.user.id}_{plan_data['id']}",
             'approval_url': approval_url,
-            'status': subscription.get('status', 'APPROVAL_PENDING'),
+            'status': 'APPROVAL_PENDING',
             'plan_name': plan_data['name'],
-            'amount': plan_data['price']
+            'amount': plan_data['price'],
+            'order_id': order['id'],  # Store for later capture
+            'server_managed': True
         })
         
     except Exception as e:
@@ -449,9 +378,8 @@ def create_subscription(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_subscription(request):
-    """Cancel the current PayPal subscription"""
+    """Cancel the current server-managed subscription"""
     try:
-        # Get the client profile
         try:
             client = Client.objects.get(user=request.user)
         except Client.DoesNotExist:
@@ -460,33 +388,21 @@ def cancel_subscription(request):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        if not client.paypal_subscription_id:
+        if client.status != 'active':
             return Response(
                 {'error': 'No active subscription found'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        paypal_client = PayPalAPIClient()
         reason = request.data.get('reason', 'Customer requested cancellation')
         
-        # Cancel subscription in PayPal
-        cancel_data = {
-            "reason": reason
-        }
-        
-        response = paypal_client.make_request(
-            'POST', 
-            f'/v1/billing/subscriptions/{client.paypal_subscription_id}/cancel',
-            cancel_data
-        )
-        
-        # Update local client record
+        # Cancel subscription locally
         client.status = 'cancelled'
         client.payment_status = 'none'
         client.subscription_end_date = timezone.now()
         client.save()
         
-        logger.info(f"Subscription {client.paypal_subscription_id} cancelled for user {request.user.id}")
+        logger.info(f"Server-managed subscription cancelled for user {request.user.id}")
         
         return Response({
             'success': True,
@@ -795,8 +711,8 @@ def get_admin_billing_settings_stub(request):
             'paypal_client_id': getattr(settings, 'PAYPAL_CLIENT_ID', ''),
             'paypal_environment': 'sandbox' if 'sandbox' in getattr(settings, 'PAYPAL_BASE_URL', '') else 'live',
             'webhook_url': f"{getattr(settings, 'BACKEND_URL', 'http://localhost:8000')}/api/billing/webhook/",
-            'plans_configured': len(PAYPAL_PLANS),
-            'available_plans': list(PAYPAL_PLANS.keys())
+            'plans_configured': len(SERVER_PLANS),
+            'available_plans': list(SERVER_PLANS.keys())
         }
     })
 
