@@ -1,4 +1,4 @@
-// client/src/components/PayPalElements.tsx - Complete PayPal Payment Component
+// client/src/components/PayPalElements.tsx - FIXED to require actual payment
 import React, { useState, useEffect, useRef } from 'react';
 import { CreditCard, Lock, AlertCircle, Loader2, Shield, FileText } from 'lucide-react';
 
@@ -21,7 +21,7 @@ interface PayPalElementsProps {
   description: string;
   isSubscription?: boolean;
   planName?: string;
-  isSetup?: boolean; // Not applicable for PayPal
+  isSetup?: boolean;
   invoiceNumber?: string;
 }
 
@@ -57,7 +57,7 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
     }
 
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID}&currency=USD&intent=${isSubscription ? 'subscription' : 'capture'}`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID}&currency=USD&intent=${isSubscription ? 'subscription' : 'capture'}&vault=${isSubscription ? 'true' : 'false'}`;
     script.async = true;
     script.onload = () => {
       setPaypalLoaded(true);
@@ -86,7 +86,7 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
     buttonsRendered.current = true;
 
     if (isSubscription && subscriptionData) {
-      // Render subscription approval buttons
+      // FIXED: Proper subscription flow that requires actual payment
       window.paypal.Buttons({
         style: {
           layout: 'vertical',
@@ -95,15 +95,22 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
           label: 'subscribe',
           height: 45
         },
+        
+        // CRITICAL: This creates the subscription but doesn't activate it
         createSubscription: () => {
+          // Return the subscription ID that was created on the server
           return subscriptionData.subscription_id;
         },
+        
+        // CRITICAL: This is called ONLY after user approves/pays on PayPal
         onApprove: async (data: any) => {
           setProcessing(true);
           setError(null);
           
+          console.log('PayPal onApprove called with:', data);
+          
           try {
-            // Call backend to confirm subscription activation
+            // IMPORTANT: This endpoint will verify the payment was actually made
             const response = await fetch('/api/billing/approve-subscription/', {
               method: 'POST',
               headers: {
@@ -115,37 +122,41 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
               })
             });
 
-            if (response.ok) {
-              console.log('Subscription approved:', data);
+            const responseData = await response.json();
+
+            if (response.ok && responseData.success) {
+              console.log('Subscription payment verified and activated:', responseData);
               onSuccess();
             } else {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Subscription approval failed');
+              throw new Error(responseData.error || 'Subscription activation failed');
             }
           } catch (err) {
-            console.error('Subscription approval error:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Subscription approval failed';
+            console.error('Subscription activation error:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Subscription activation failed';
             setError(errorMessage);
             onError(errorMessage);
           } finally {
             setProcessing(false);
           }
         },
+        
         onError: (err: any) => {
           console.error('PayPal subscription error:', err);
-          const errorMessage = 'Subscription payment failed';
+          const errorMessage = 'Subscription payment failed. Please try again.';
           setError(errorMessage);
           onError(errorMessage);
           setProcessing(false);
         },
+        
         onCancel: () => {
-          setError('Payment was cancelled');
+          console.log('PayPal subscription cancelled by user');
+          setError('Payment was cancelled. You can try again anytime.');
           setProcessing(false);
         }
       }).render(paypalRef.current);
 
     } else if (orderData) {
-      // Render one-time payment buttons
+      // One-time payment flow (for invoices)
       window.paypal.Buttons({
         style: {
           layout: 'vertical',
@@ -174,12 +185,13 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
               })
             });
 
-            if (response.ok) {
-              console.log('Payment captured:', data);
+            const responseData = await response.json();
+
+            if (response.ok && responseData.success) {
+              console.log('Payment captured:', responseData);
               onSuccess();
             } else {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Payment capture failed');
+              throw new Error(responseData.error || 'Payment capture failed');
             }
           } catch (err) {
             console.error('Payment capture error:', err);
@@ -192,7 +204,7 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
         },
         onError: (err: any) => {
           console.error('PayPal payment error:', err);
-          const errorMessage = 'Payment failed';
+          const errorMessage = 'Payment failed. Please try again.';
           setError(errorMessage);
           onError(errorMessage);
           setProcessing(false);
@@ -228,7 +240,7 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
     } else if (isSubscription) {
       return {
         title: `Subscribe to ${planName}`,
-        subtitle: 'Start your subscription today',
+        subtitle: 'Complete payment to activate your subscription',
         amount: formatCurrency(amount)
       };
     } else {
@@ -338,7 +350,9 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
                   <div className="text-center mt-4">
                     <div className="flex items-center justify-center">
                       <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      <span className="text-gray-600">Processing payment...</span>
+                      <span className="text-gray-600">
+                        {isSubscription ? 'Processing subscription payment...' : 'Processing payment...'}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -351,7 +365,12 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
             <Lock className="w-5 h-5 text-gray-500" />
             <div className="text-sm text-gray-600">
               <p className="font-medium">Secure Payment</p>
-              <p>Powered by PayPal's secure payment system</p>
+              <p>
+                {isSubscription 
+                  ? 'Complete your subscription payment securely through PayPal'
+                  : 'Powered by PayPal\'s secure payment system'
+                }
+              </p>
             </div>
           </div>
 
@@ -385,13 +404,14 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
             </div>
           )}
 
-          {/* Additional Info */}
+          {/* Subscription Terms */}
           {isSubscription && (
             <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="text-sm text-blue-800 space-y-1">
-                <p className="font-medium">Subscription Terms:</p>
-                <p>• Your subscription will renew automatically each month</p>
-                <p>• You can cancel anytime from your billing settings</p>
+                <p className="font-medium">Important Subscription Terms:</p>
+                <p>• You must complete payment through PayPal to activate your subscription</p>
+                <p>• Your subscription will renew automatically each month via PayPal</p>
+                <p>• You can cancel anytime from your PayPal account or billing settings</p>
                 <p>• 30-day money-back guarantee</p>
                 <p>• No setup fees or hidden charges</p>
               </div>
@@ -406,6 +426,7 @@ export const PayPalElements: React.FC<PayPalElementsProps> = ({
                 <p>Using PayPal Sandbox environment</p>
                 <p>No real money will be charged</p>
                 <p>Use PayPal sandbox test accounts for testing</p>
+                <p>Payment verification is still enforced</p>
               </div>
             </div>
           )}

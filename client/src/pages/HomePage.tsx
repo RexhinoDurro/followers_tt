@@ -1,6 +1,6 @@
 // pages/HomePage.tsx - Fully Responsive Version
 import React, { useState, useEffect } from 'react';
-import { Play, TrendingUp, ArrowRight, CheckCircle, Quote } from 'lucide-react';
+import { Play, TrendingUp, ArrowRight, CheckCircle, Quote, Users, Clock, Shield, CreditCard, TrendingUp as Growth, Target } from 'lucide-react';
 
 interface HomePageProps {
   onGetStarted?: () => void;
@@ -20,23 +20,23 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
   const services = [
     {
       platform: 'YouTube',
-      icon: '🎥',
-      color: 'from-red-500 to-red-600',
+      icon: '/src/assets/youtube.png',
+      color: 'from-red-100 to-red-200',
       description: 'Grow your channel with targeted subscribers, views, and engagement that drives real results.',
       features: ['Real Subscribers', 'High-Retention Views', 'Monetization Ready', 'Algorithm Optimization'],
       stats: { followers: '2M+', engagement: '95%', clients: '1.2K' }
     },
     {
       platform: 'TikTok',
-      icon: '🎵',
-      color: 'from-black to-gray-800',
+      icon: '/src/assets/tiktok.png',
+      color: 'from-gray-200 to-gray-300',
       description: 'Viral growth strategies that get your content on the For You Page and build authentic followings.',
       features: ['Viral Content Strategy', 'FYP Optimization', 'Trending Hashtags', 'Engagement Pods'],
       stats: { followers: '5M+', engagement: '88%', clients: '2.1K' }
     },
     {
       platform: 'Instagram',
-      icon: '📸',
+      icon: '/src/assets/instagram.png',
       color: 'from-purple-500 to-pink-500',
       description: 'Build a stunning Instagram presence with real followers, engagement, and brand partnerships.',
       features: ['Story Strategies', 'Reels Optimization', 'Brand Partnerships', 'Shopping Integration'],
@@ -72,12 +72,12 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
   ];
 
   const features = [
-    { icon: '✅', title: 'Real Users Only', description: 'No bots or fake accounts. Every follower is a real person.' },
-    { icon: '🚀', title: 'Fast Delivery', description: 'See results within 24-72 hours of starting your campaign.' },
-    { icon: '🛡️', title: '100% Safe', description: 'Compliant with all platform guidelines. Your account stays secure.' },
-    { icon: '💰', title: 'Money-Back Guarantee', description: '30-day guarantee. Not satisfied? Get your money back.' },
-    { icon: '📈', title: 'Organic Growth', description: 'Natural growth patterns that look authentic to algorithms.' },
-    { icon: '🎯', title: 'Targeted Audience', description: 'Reach people who are genuinely interested in your content.' }
+    { icon: Users, title: 'Real Users Only', description: 'No bots or fake accounts. Every follower is a real person.' },
+    { icon: Clock, title: 'Fast Delivery', description: 'See results within 24-72 hours of starting your campaign.' },
+    { icon: Shield, title: '100% Safe', description: 'Compliant with all platform guidelines. Your account stays secure.' },
+    { icon: CreditCard, title: 'Money-Back Guarantee', description: '30-day guarantee. Not satisfied? Get your money back.' },
+    { icon: Growth, title: 'Organic Growth', description: 'Natural growth patterns that look authentic to algorithms.' },
+    { icon: Target, title: 'Targeted Audience', description: 'Reach people who are genuinely interested in your content.' }
   ];
 
   const stats = [
@@ -161,15 +161,15 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
             {/* Platform Icons */}
             <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-8 text-gray-500">
               <span className="text-xs sm:text-sm font-medium">Available on:</span>
-              <div className="flex space-x-4 sm:space-x-6">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-lg transform hover:scale-110 transition-transform cursor-pointer">
-                  🎥
+              <div className="flex space-x-6 sm:space-x-8 items-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
+                  <img src="/src/assets/youtube.png" alt="YouTube" className="w-full h-full object-contain" />
                 </div>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-black to-gray-800 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-lg transform hover:scale-110 transition-transform cursor-pointer">
-                  🎵
+                <div className="w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
+                  <img src="/src/assets/tiktok.png" alt="TikTok" className="w-full h-full object-contain" />
                 </div>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-lg transform hover:scale-110 transition-transform cursor-pointer">
-                  📸
+                <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
+                  <img src="/src/assets/instagram.png" alt="Instagram" className="w-full h-full object-contain" />
                 </div>
               </div>
             </div>
@@ -193,10 +193,12 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
             {services.map((service, index) => (
               <div key={index} className="bg-white rounded-xl sm:rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden group">
                 {/* Header */}
-                <div className={`bg-gradient-to-r ${service.color} p-4 sm:p-6 text-white relative overflow-hidden`}>
-                  <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-white opacity-10 rounded-full -translate-y-12 sm:-translate-y-16 translate-x-12 sm:translate-x-16"></div>
+                <div className={`bg-gradient-to-r ${service.color} p-4 sm:p-6 ${service.platform === 'Instagram' ? 'text-white' : 'text-gray-800'} relative overflow-hidden`}>
+                  <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${service.platform === 'Instagram' ? 'bg-white' : 'bg-gray-300'} opacity-10 rounded-full -translate-y-12 sm:-translate-y-16 translate-x-12 sm:translate-x-16`}></div>
                   <div className="relative z-10">
-                    <div className="text-3xl sm:text-4xl mb-2">{service.icon}</div>
+                    <div className={`${service.platform === 'TikTok' ? 'w-20 h-20 sm:w-24 sm:h-24' : 'w-10 h-10 sm:w-12 sm:h-12'} mb-2`}>
+                      <img src={service.icon} alt={service.platform} className="w-full h-full object-contain" />
+                    </div>
                     <h3 className="text-xl sm:text-2xl font-bold mb-2">{service.platform}</h3>
                     <div className="flex flex-col sm:flex-row sm:space-x-4 text-xs sm:text-sm opacity-90">
                       <span>{service.stats.followers} followers</span>
@@ -247,15 +249,18 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="bg-white p-6 sm:p-8 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 text-center group">
-                <div className="text-3xl sm:text-4xl mb-3 sm:mb-4 transform group-hover:scale-110 transition-transform duration-200">
-                  {feature.icon}
+            {features.map((feature, index) => {
+              const IconComponent = feature.icon;
+              return (
+                <div key={index} className="bg-white p-6 sm:p-8 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 text-center group">
+                  <div className="flex justify-center mb-3 sm:mb-4 transform group-hover:scale-110 transition-transform duration-200">
+                    <IconComponent className="w-10 h-10 sm:w-12 sm:h-12 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">{feature.title}</h3>
+                  <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{feature.description}</p>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">{feature.title}</h3>
-                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{feature.description}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

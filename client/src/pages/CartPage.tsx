@@ -133,7 +133,7 @@ const CartPage: React.FC = () => {
           </div>
 
           <Button 
-            onClick={() => window.location.href = '/pricing'} 
+            onClick={() => window.location.href = '/services/Instagram'} 
             size="lg"
             className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4"
           >

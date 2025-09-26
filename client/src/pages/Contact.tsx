@@ -1,4 +1,4 @@
-// pages/Contact.tsx - Fully Responsive Contact Page
+
 import React, { useState } from 'react';
 
 const ContactUs = () => {
@@ -36,32 +36,48 @@ const ContactUs = () => {
       description: "Get help with your account, billing, or technical issues",
       email: "support@yourplatform.com",
       responseTime: "Within 24 hours",
-      icon: "🎧",
-      color: "from-blue-500 to-blue-600"
+      color: "from-blue-500 to-blue-600",
+      icon: (
+        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192L5.636 18.364M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+      )
     },
     {
       title: "Sales Inquiries",
       description: "Discuss pricing, enterprise solutions, or custom plans",
       email: "sales@yourplatform.com",
       responseTime: "Within 4 hours",
-      icon: "💼",
-      color: "from-green-500 to-green-600"
+      color: "from-green-500 to-green-600",
+      icon: (
+        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      )
     },
     {
       title: "Partnership",
       description: "Explore integration opportunities or business partnerships",
       email: "partners@yourplatform.com",
       responseTime: "Within 48 hours",
-      icon: "🤝",
-      color: "from-purple-500 to-purple-600"
+      color: "from-purple-500 to-purple-600",
+      icon: (
+        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+      )
     },
     {
       title: "Media & Press",
       description: "Press inquiries, media kits, and interview requests",
       email: "press@yourplatform.com",
       responseTime: "Within 24 hours",
-      icon: "📰",
-      color: "from-orange-500 to-orange-600"
+      color: "from-orange-500 to-orange-600",
+      icon: (
+        <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
+        </svg>
+      )
     }
   ];
 
@@ -326,47 +342,7 @@ const ContactUs = () => {
         </div>
       </section>
 
-      {/* Alternative Contact Methods */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-8 sm:mb-12">Other Ways to Connect</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="text-center">
-              <div className="bg-blue-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <span className="text-2xl sm:text-3xl">💬</span>
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 sm:mb-2">Live Chat</h3>
-              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Chat with our support team in real-time</p>
-              <button className="bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base">
-                Start Chat
-              </button>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-purple-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <span className="text-2xl sm:text-3xl">📱</span>
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 sm:mb-2">Social Media</h3>
-              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Follow us for updates and quick support</p>
-              <div className="flex justify-center space-x-3 sm:space-x-4">
-                <button className="text-blue-600 hover:text-blue-800 text-sm sm:text-base">Twitter</button>
-                <button className="text-blue-600 hover:text-blue-800 text-sm sm:text-base">LinkedIn</button>
-              </div>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-green-100 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <span className="text-2xl sm:text-3xl">📚</span>
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 sm:mb-2">Help Center</h3>
-              <p className="text-gray-600 mb-3 sm:mb-4 text-sm sm:text-base">Browse our knowledge base and tutorials</p>
-              <button className="bg-green-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base">
-                Visit Help Center
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+     
     </div>
   );
 };
