@@ -332,24 +332,33 @@ def create_subscription(request):
         plan_name = request.data.get('plan_name')
         price_id = request.data.get('price_id', '').replace('price_', '').replace('_monthly', '')
         
+        logger.info(f"Creating subscription - plan_name: {plan_name}, price_id: {price_id}")
+        logger.info(f"Request data: {request.data}")
+        
         # Find the plan
         plan_data = None
-        for plan_id, plan in PAYPAL_PLANS.items():
+        for plan_id, plan in SERVER_PLANS.items():
             if plan_id == price_id or plan['name'] == plan_name:
                 plan_data = plan
                 break
         
         if not plan_data:
+            logger.error(f"Plan not found - plan_name: {plan_name}, price_id: {price_id}")
             return Response(
-                {'error': 'Invalid plan selected'},
+                {'error': f'Invalid plan selected. Available plans: {list(SERVER_PLANS.keys())}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        logger.info(f"Found plan: {plan_data['name']} (${plan_data['price']})")
+        
         if not plan_data.get('paypal_plan_id'):
+            logger.error(f"PayPal plan ID not configured for {plan_data['name']}")
             return Response(
                 {'error': f'PayPal plan ID not configured for {plan_data["name"]}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        logger.info(f"Using PayPal plan ID: {plan_data['paypal_plan_id']}")
         
         paypal_client = PayPalAPIClient()
         
@@ -378,7 +387,18 @@ def create_subscription(request):
             }
         }
         
-        subscription = paypal_client.make_request('POST', '/v1/billing/subscriptions', subscription_data)
+        logger.info(f"Creating PayPal subscription with data: {subscription_data}")
+        
+        try:
+            subscription = paypal_client.make_request('POST', '/v1/billing/subscriptions', subscription_data)
+        except Exception as paypal_error:
+            logger.error(f"PayPal API error: {paypal_error}")
+            return Response(
+                {'error': f'PayPal API error: {str(paypal_error)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        logger.info(f"PayPal subscription created: {subscription}")
         
         # Find approval URL
         approval_url = None
@@ -388,11 +408,13 @@ def create_subscription(request):
                 break
         
         if not approval_url:
+            logger.error("No approval URL found in PayPal response")
+            logger.error(f"PayPal response: {subscription}")
             raise Exception("No approval URL found in PayPal response")
         
         # IMPORTANT: Store subscription ID but DON'T activate yet
         try:
-            client = Client.objects.get(user=request.user)
+            client = ensure_client_profile(request.user)
             # Store the subscription ID but keep status as pending
             client.paypal_subscription_id = subscription['id']
             client.current_plan = plan_data['id']
@@ -402,8 +424,10 @@ def create_subscription(request):
             client.status = 'pending'
             client.payment_status = 'pending'
             client.save()
-        except Client.DoesNotExist:
-            logger.error(f"Client profile not found for user {request.user.id}")
+            logger.info(f"Saved subscription ID to client profile: {client.id}")
+        except Exception as db_error:
+            logger.error(f"Error saving to database: {db_error}")
+            # Continue anyway - subscription is created in PayPal
         
         logger.info(f"Created PayPal subscription {subscription['id']} for user {request.user.id} - AWAITING APPROVAL")
         
@@ -417,9 +441,9 @@ def create_subscription(request):
         })
         
     except Exception as e:
-        logger.error(f"Error creating subscription: {e}")
+        logger.error(f"Error creating subscription: {e}", exc_info=True)
         return Response(
-            {'error': 'Failed to create subscription'},
+            {'error': f'Failed to create subscription: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
