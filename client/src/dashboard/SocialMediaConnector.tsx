@@ -173,32 +173,26 @@ const SocialMediaConnector: React.FC = () => {
   };
 
   const handleConnect = async (platform: string): Promise<void> => {
-    try {
-      setConnecting(platform);
-      setError(null);
-      
-      // Initiate OAuth flow
-      const oauthData = await ApiService.initiateOAuth(platform);
-      
-      // In a real app, you would redirect to the OAuth URL
-      // For demo purposes, we'll simulate the callback
-      const mockCode = 'mock_authorization_code';
-      const result = await ApiService.handleOAuthCallback(platform, mockCode, oauthData.state);
-      
-      // Add the new account to the list
-      setConnectedAccounts(prev => [...prev, result.account]);
-      setSuccess(result.message);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
-      
-    } catch (err) {
-      setError(`Failed to connect ${platform} account`);
-      console.error(err);
-    } finally {
-      setConnecting(null);
+  try {
+    setConnecting(platform);
+    setError(null);
+    
+    // ✅ CORRECT: Use the public method
+    const response = await ApiService.initiateOAuth(platform);
+    
+    if (response && typeof response === 'object' && 'oauth_url' in response) {
+      // Redirect to OAuth URL (backend will handle callback)
+      window.location.href = response.oauth_url;
+    } else {
+      throw new Error('No OAuth URL received');
     }
-  };
+    
+  } catch (err) {
+    setError(`Failed to connect ${platform} account`);
+    console.error(err);
+    setConnecting(null);
+  }
+};
 
   const handleDisconnect = async (accountId: string, username: string): Promise<void> => {
     if (!window.confirm(`Are you sure you want to disconnect ${username}? This will stop data collection but preserve historical data.`)) {

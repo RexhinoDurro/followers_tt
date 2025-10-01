@@ -80,6 +80,8 @@ interface Message {
   read: boolean;
 }
 
+
+
 const ClientOverview: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<ClientStats | null>(null);
@@ -299,7 +301,47 @@ const ClientOverview: React.FC = () => {
     }
   };
 
-  
+  // Check URL for OAuth success/error messages
+  useEffect(() => {
+    // Check URL for OAuth success/error messages
+    const hash = window.location.hash;
+    const hashParams = new URLSearchParams(hash.split('?')[1] || '');
+    
+    const oauthSuccess = hashParams.get('oauth_success');
+    const oauthError = hashParams.get('oauth_error');
+    const username = hashParams.get('username');
+    
+    if (oauthSuccess) {
+      // Show success message
+      alert(`✅ ${oauthSuccess} account connected successfully! Username: ${username}`);
+      
+      // Refresh data to show new account
+      fetchData();
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard#overview');
+    }
+    
+    if (oauthError) {
+      // Show error message
+      const errorMessages: Record<string, string> = {
+        'denied': 'You denied the authorization request',
+        'missing_params': 'Missing required parameters',
+        'invalid_state': 'Security validation failed. Please try again',
+        'session_expired': 'Your session expired. Please try again',
+        'no_token': 'Failed to obtain access token',
+        'api_failed': 'Failed to communicate with social media API',
+        'no_channel': 'No YouTube channel found for this account',
+        'unknown': 'An unknown error occurred'
+      };
+      
+      alert(`❌ Connection failed: ${errorMessages[oauthError] || oauthError}`);
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard#overview');
+    }
+  }, []);
+
   useEffect(() => {
     if (user?.role === 'client') {
       fetchData();
