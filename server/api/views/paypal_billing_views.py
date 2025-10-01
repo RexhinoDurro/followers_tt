@@ -45,11 +45,13 @@ def ensure_client_profile(user):
         return client
 
 # SERVER-BASED PLAN CONFIGURATION - No PayPal Plan IDs needed
-PAYPAL_PLANS = {
+# SERVER-BASED PLAN CONFIGURATION - No PayPal Plan IDs needed
+SERVER_PLANS = {
     'starter': {
         'id': 'starter',
         'name': 'Starter Plan',
         'price': 100,
+        'billing_cycle': 'monthly',
         'paypal_plan_id': getattr(settings, 'PAYPAL_STARTER_PLAN_ID', 'P-5ML4271244454362WXNWU5NQ'),
         'features': [
             '12 posts (photos/reels)',
@@ -63,6 +65,7 @@ PAYPAL_PLANS = {
         'id': 'pro', 
         'name': 'Pro Plan',
         'price': 250,
+        'billing_cycle': 'monthly',
         'paypal_plan_id': getattr(settings, 'PAYPAL_PRO_PLAN_ID', 'P-1GJ4271244454362WXNWU5NR'),
         'features': [
             '20 posts + reels',
@@ -76,6 +79,7 @@ PAYPAL_PLANS = {
         'id': 'premium',
         'name': 'Premium Plan', 
         'price': 400,
+        'billing_cycle': 'monthly',
         'paypal_plan_id': getattr(settings, 'PAYPAL_PREMIUM_PLAN_ID', 'P-2GJ4271244454362WXNWU5NS'),
         'features': [
             'Instagram + Facebook + TikTok',
@@ -86,6 +90,9 @@ PAYPAL_PLANS = {
         ]
     }
 }
+
+# Keep alias for backward compatibility with other parts of code
+PAYPAL_PLANS = SERVER_PLANS
 
 class PayPalAPIClient:
     """PayPal API client for handling authentication and requests"""
