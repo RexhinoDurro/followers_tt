@@ -106,6 +106,46 @@ const ClientBilling: React.FC = () => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
+  // Load PayPal SDK
+  useEffect(() => {
+    const loadPayPalSDK = () => {
+      // Check if PayPal SDK is already loaded
+      if (window.paypal) {
+        console.log('PayPal SDK already loaded');
+        return;
+      }
+
+      const script = document.createElement('script');
+      const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID;
+      
+      if (!clientId) {
+        console.error('PayPal Client ID not found in environment variables');
+        setError('PayPal configuration error. Please contact support.');
+        return;
+      }
+
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=subscription&vault=true`;
+      script.async = true;
+      script.onload = () => {
+        console.log('PayPal SDK loaded successfully');
+      };
+      script.onerror = () => {
+        console.error('Failed to load PayPal SDK');
+        setError('Failed to load payment system. Please refresh the page.');
+      };
+      
+      document.body.appendChild(script);
+
+      return () => {
+        if (document.body.contains(script)) {
+          document.body.removeChild(script);
+        }
+      };
+    };
+
+    loadPayPalSDK();
+  }, []);
+
   useEffect(() => {
     fetchBillingData();
   }, []);
@@ -218,10 +258,14 @@ const ClientBilling: React.FC = () => {
       setProcessingSubscription(true);
       setError(null);
       
+      console.log('Creating subscription for plan:', selectedPlan);
+      
       const data = await ApiService.createSubscription({
         price_id: `price_${selectedPlan.id}_monthly`,
         plan_name: selectedPlan.name
       }) as SubscriptionResponse;
+
+      console.log('Subscription response:', data);
 
       if (!data.approval_url) {
         throw new Error('No approval URL received from PayPal');

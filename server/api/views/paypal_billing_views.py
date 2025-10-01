@@ -44,15 +44,13 @@ def ensure_client_profile(user):
         logger.info(f"Created missing client profile for user {user.id}")
         return client
 
-# SERVER-BASED PLAN CONFIGURATION - No PayPal Plan IDs needed
-# SERVER-BASED PLAN CONFIGURATION - No PayPal Plan IDs needed
 SERVER_PLANS = {
     'starter': {
         'id': 'starter',
         'name': 'Starter Plan',
         'price': 100,
         'billing_cycle': 'monthly',
-        'paypal_plan_id': getattr(settings, 'PAYPAL_STARTER_PLAN_ID', 'P-5ML4271244454362WXNWU5NQ'),
+        'paypal_plan_id': 'P-53U63963MC933251TNDOIX4A',  # ✅ YOUR ACTUAL STARTER PLAN ID
         'features': [
             '12 posts (photos/reels)',
             '12 interactive stories', 
@@ -66,7 +64,7 @@ SERVER_PLANS = {
         'name': 'Pro Plan',
         'price': 250,
         'billing_cycle': 'monthly',
-        'paypal_plan_id': getattr(settings, 'PAYPAL_PRO_PLAN_ID', 'P-1GJ4271244454362WXNWU5NR'),
+        'paypal_plan_id': 'P-91K448064U4101319NDOIZ4I',  # ✅ YOUR ACTUAL PRO PLAN ID
         'features': [
             '20 posts + reels',
             'Advanced promotional campaigns',
@@ -80,7 +78,7 @@ SERVER_PLANS = {
         'name': 'Premium Plan', 
         'price': 400,
         'billing_cycle': 'monthly',
-        'paypal_plan_id': getattr(settings, 'PAYPAL_PREMIUM_PLAN_ID', 'P-2GJ4271244454362WXNWU5NS'),
+        'paypal_plan_id': 'P-6G913718359162141NDOI2QQ',  # ✅ YOUR ACTUAL PREMIUM PLAN ID
         'features': [
             'Instagram + Facebook + TikTok',
             '30+ posts (design, reels, carousel)',
