@@ -4,7 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 import requests
@@ -219,12 +219,15 @@ def initiate_youtube_oauth(request):
 
 @csrf_exempt
 @api_view(['GET'])
+@permission_classes([AllowAny])  # ← FIX: Allow unauthenticated access
 def handle_youtube_callback(request):
     """Step 2: Handle YouTube callback"""
     try:
         code = request.GET.get('code')
         state = request.GET.get('state')
         error = request.GET.get('error')
+        
+        logger.info(f"YouTube callback received - code: {code[:20] if code else None}, state: {state[:20] if state else None}")
         
         if error:
             logger.warning(f"YouTube OAuth denied: {error}")
@@ -240,8 +243,14 @@ def handle_youtube_callback(request):
         
         # Verify state
         stored_state = request.session.get('oauth_state_youtube')
-        if not stored_state or stored_state != state:
-            logger.error("YouTube OAuth state mismatch")
+        if not stored_state:
+            logger.error("No stored state in session")
+            return HttpResponseRedirect(
+                f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=session_expired"
+            )
+        
+        if stored_state != state:
+            logger.error(f"YouTube OAuth state mismatch - stored: {stored_state[:20]}, received: {state[:20]}")
             return HttpResponseRedirect(
                 f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=invalid_state"
             )
@@ -253,6 +262,8 @@ def handle_youtube_callback(request):
                 f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=session_expired"
             )
         
+        logger.info(f"Processing YouTube callback for user_id: {user_id}")
+        
         # Exchange code for tokens
         token_url = "https://oauth2.googleapis.com/token"
         token_data = {
@@ -263,15 +274,18 @@ def handle_youtube_callback(request):
             'redirect_uri': settings.YOUTUBE_REDIRECT_URI,
         }
         
+        logger.info("Exchanging code for tokens...")
         token_response = requests.post(token_url, data=token_data)
         token_response.raise_for_status()
         token_result = token_response.json()
         
         if 'access_token' not in token_result:
-            logger.error("No access token in YouTube response")
+            logger.error(f"No access token in YouTube response: {token_result}")
             return HttpResponseRedirect(
                 f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=no_token"
             )
+        
+        logger.info("Access token received, fetching channel info...")
         
         # Get YouTube channel info
         from googleapiclient.discovery import build
@@ -292,7 +306,7 @@ def handle_youtube_callback(request):
         ).execute()
         
         if not channels_response.get('items'):
-            logger.error("No YouTube channel found")
+            logger.error("No YouTube channel found for this account")
             return HttpResponseRedirect(
                 f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=no_channel"
             )
@@ -300,6 +314,8 @@ def handle_youtube_callback(request):
         channel_data = channels_response['items'][0]
         channel_id = channel_data['id']
         channel_title = channel_data['snippet']['title']
+        
+        logger.info(f"Channel found: {channel_title} (ID: {channel_id})")
         
         # Save account
         from ..models import User
@@ -322,6 +338,8 @@ def handle_youtube_callback(request):
             }
         )
         
+        logger.info(f"Account saved: {account.username} (created: {created})")
+        
         # Clean up session
         if 'oauth_state_youtube' in request.session:
             del request.session['oauth_state_youtube']
@@ -329,16 +347,21 @@ def handle_youtube_callback(request):
             del request.session['oauth_user_id']
         
         # Trigger sync
-        sync_youtube_data.delay(str(account.id))
+        try:
+            sync_youtube_data.delay(str(account.id))
+            logger.info(f"Sync task queued for account {account.id}")
+        except Exception as sync_error:
+            logger.warning(f"Failed to queue sync task: {sync_error}")
+            # Don't fail the connection if sync fails
         
-        logger.info(f"YouTube channel connected: {account.username} for user {user.email}")
+        logger.info(f"YouTube channel connected successfully: {account.username} for user {user.email}")
         
         return HttpResponseRedirect(
             f"{settings.FRONTEND_URL}/dashboard#overview?oauth_success=youtube&username={channel_title}"
         )
         
     except requests.RequestException as e:
-        logger.error(f"YouTube OAuth API error: {str(e)}")
+        logger.error(f"YouTube OAuth API error: {str(e)}", exc_info=True)
         return HttpResponseRedirect(
             f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=api_failed"
         )
@@ -347,7 +370,6 @@ def handle_youtube_callback(request):
         return HttpResponseRedirect(
             f"{settings.FRONTEND_URL}/dashboard#overview?oauth_error=unknown"
         )
-
 # ============ OTHER ENDPOINTS (Keep existing) ============
 
 @api_view(['GET'])
