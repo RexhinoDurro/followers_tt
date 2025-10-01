@@ -20,7 +20,7 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
   const services = [
     {
       platform: 'YouTube',
-      icon: '/src/assets/youtube.png',
+      icon: '/youtube.png',
       color: 'from-red-100 to-red-200',
       description: 'Grow your channel with targeted subscribers, views, and engagement that drives real results.',
       features: ['Real Subscribers', 'High-Retention Views', 'Monetization Ready', 'Algorithm Optimization'],
@@ -28,7 +28,7 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
     },
     {
       platform: 'TikTok',
-      icon: '/src/assets/tiktok.png',
+      icon: '/tiktok.png',
       color: 'from-gray-200 to-gray-300',
       description: 'Viral growth strategies that get your content on the For You Page and build authentic followings.',
       features: ['Viral Content Strategy', 'FYP Optimization', 'Trending Hashtags', 'Engagement Pods'],
@@ -36,7 +36,7 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
     },
     {
       platform: 'Instagram',
-      icon: '/src/assets/instagram.png',
+      icon: '/instagram.png',
       color: 'from-purple-500 to-pink-500',
       description: 'Build a stunning Instagram presence with real followers, engagement, and brand partnerships.',
       features: ['Story Strategies', 'Reels Optimization', 'Brand Partnerships', 'Shopping Integration'],
@@ -163,13 +163,13 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
               <span className="text-xs sm:text-sm font-medium">Available on:</span>
               <div className="flex space-x-6 sm:space-x-8 items-center">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
-                  <img src="/src/assets/youtube.png" alt="YouTube" className="w-full h-full object-contain" />
+                  <img src="/youtube.png" alt="YouTube" className="w-full h-full object-contain" />
                 </div>
                 <div className="w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
-                  <img src="/src/assets/tiktok.png" alt="TikTok" className="w-full h-full object-contain" />
+                  <img src="/tiktok.png" alt="TikTok" className="w-full h-full object-contain" />
                 </div>
                 <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
-                  <img src="/src/assets/instagram.png" alt="Instagram" className="w-full h-full object-contain" />
+                  <img src="/instagram.png" alt="Instagram" className="w-full h-full object-contain" />
                 </div>
               </div>
             </div>

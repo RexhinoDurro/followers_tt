@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 import requests
 import dateutil.parser
-from ..models import Client, Invoice
+from ..models import Client, Invoice, User
 
 logger = logging.getLogger(__name__)
 
