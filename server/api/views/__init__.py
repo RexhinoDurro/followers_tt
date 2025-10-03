@@ -19,6 +19,9 @@ from .client.content_views import ContentPostViewSet
 from .client.performance_views import PerformanceDataViewSet
 from .admin.invoice_views import InvoiceViewSet
 from .client.social_views import SocialMediaAccountViewSet, get_realtime_metrics
+from .message_views import MessageViewSet
+from .notification_views import NotificationViewSet
+from .file_views import FileViewSet
 
 # Profile views are now included in auth_views above
 

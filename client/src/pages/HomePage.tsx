@@ -165,7 +165,7 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
                 <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
                   <img src="/youtube.png" alt="YouTube" className="w-full h-full object-contain" />
                 </div>
-                <div className="w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
                   <img src="/tiktok.png" alt="TikTok" className="w-full h-full object-contain" />
                 </div>
                 <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center transform hover:scale-110 transition-transform cursor-pointer">
@@ -196,7 +196,7 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
                 <div className={`bg-gradient-to-r ${service.color} p-4 sm:p-6 ${service.platform === 'Instagram' ? 'text-white' : 'text-gray-800'} relative overflow-hidden`}>
                   <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${service.platform === 'Instagram' ? 'bg-white' : 'bg-gray-300'} opacity-10 rounded-full -translate-y-12 sm:-translate-y-16 translate-x-12 sm:translate-x-16`}></div>
                   <div className="relative z-10">
-                    <div className={`${service.platform === 'TikTok' ? 'w-20 h-20 sm:w-24 sm:h-24' : 'w-10 h-10 sm:w-12 sm:h-12'} mb-2`}>
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 mb-2">
                       <img src={service.icon} alt={service.platform} className="w-full h-full object-contain" />
                     </div>
                     <h3 className="text-xl sm:text-2xl font-bold mb-2">{service.platform}</h3>
