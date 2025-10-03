@@ -53,12 +53,7 @@ export const Footer: React.FC = () => {
               <li>
                 <Link to="/services/youtube" className="hover:text-purple-400 transition-colors">
                   YouTube Growth
-                </Link>
-              </li>
-              <li>
-                <Link to="/pricing" className="hover:text-purple-400 transition-colors">
-                  Custom Packages
-                </Link>
+              
               </li>
             </ul>
           </div>
@@ -73,7 +68,7 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/faq" className="hover:text-purple-400 transition-colors">
+                <Link to="/how-it-works" className="hover:text-purple-400 transition-colors">
                   FAQ
                 </Link>
               </li>

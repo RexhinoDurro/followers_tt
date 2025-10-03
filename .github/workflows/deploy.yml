@@ -2,7 +2,7 @@ name: Auto Deploy to VPS
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, static ]   # add any other branches you want
   workflow_dispatch:
 
 jobs:
@@ -17,7 +17,8 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         script: |
-          echo "🔄 Starting deployment..."
+          echo "🔄 Starting deployment on branch: ${{ github.ref_name }}"
+
           cd /home/ubuntu/followers_tt
           
           # Show current status
@@ -29,10 +30,10 @@ jobs:
           git add -A
           git stash push -m "Backup before deployment $(date)"
           
-          # Force pull latest changes
-          echo "⬇️ Pulling latest changes..."
-          git fetch origin main
-          git reset --hard origin/main
+          # Force pull latest changes from the triggered branch
+          echo "⬇️ Pulling latest changes from branch: ${{ github.ref_name }}"
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
           
           # Make deploy script executable
           chmod +x deploy.sh

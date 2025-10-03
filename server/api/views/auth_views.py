@@ -1,11 +1,96 @@
-# server/api/views/auth_views.py - Add this file
+from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth import update_session_auth_hash
-from ..models import User
-from ..serializers import UserSerializer
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
+from django.contrib.auth import authenticate, login, logout
+from django.db.models import Sum, Count, Q, Avg
+from django.utils import timezone
+from datetime import datetime, timedelta
+import calendar
+import logging
+from django.urls import path
+from celery import shared_task
+
+# Import serializers from the correct location
+from ..serializers import (
+    UserSerializer, UserRegistrationSerializer, UserLoginSerializer,
+    ClientSerializer, TaskSerializer, ContentPostSerializer,
+    PerformanceDataSerializer, MessageSerializer, InvoiceSerializer,
+    TeamMemberSerializer, ProjectSerializer, FileSerializer,
+    NotificationSerializer, DashboardStatsSerializer,
+    ClientDashboardStatsSerializer, BulkTaskUpdateSerializer,
+    BulkContentApprovalSerializer, FileUploadSerializer,
+    SocialMediaAccountSerializer, RealTimeMetricsSerializer
+)
+
+logger = logging.getLogger(__name__)
+
+from ..models import (
+    User, Client, Task, ContentPost, PerformanceData,
+    Message, Invoice, TeamMember, Project, File, Notification,
+    SocialMediaAccount, RealTimeMetrics
+)
+
+# Authentication Views
+class RegisterView(generics.CreateAPIView):
+    """User registration view"""
+    queryset = User.objects.all()
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        token, created = Token.objects.get_or_create(user=user)
+        
+        return Response({
+            'user': UserSerializer(user).data,
+            'token': token.key
+        }, status=status.HTTP_201_CREATED)
+
+class LoginView(generics.GenericAPIView):
+    """User login view"""
+    serializer_class = UserLoginSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        token, created = Token.objects.get_or_create(user=user)
+        
+        return Response({
+            'user': UserSerializer(user).data,
+            'token': token.key
+        })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    """User logout view"""
+    try:
+        request.user.auth_token.delete()
+    except:
+        pass
+    return Response({'message': 'Successfully logged out'})
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def current_user_view(request):
+    """Get or update current user profile"""
+    if request.method == 'GET':
+        return Response(UserSerializer(request.user).data)
+    
+    elif request.method == 'PATCH':
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])

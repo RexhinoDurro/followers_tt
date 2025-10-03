@@ -1,4 +1,4 @@
-// client/src/App.tsx - Updated with Notification System and Fixed Dashboard Routing
+// client/src/App.tsx - Updated with All Service Pages
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -15,9 +15,17 @@ import Contact from './pages/Contact';
 import HowItWorksPage from './pages/HowItWorksPage';
 import CartPage from './pages/CartPage';
 import OrderConfirmation from './pages/OrderConfirmation';
+
+// Import Service Pages
 import InstagramGrowth from './pages/services/InstagramGrowth';
+import TikTokGrowth from './pages/services/TikTokGrowth';
+import YouTubeGrowth from './pages/services/YouTubeGrowth';
 
-
+// Import Policy Pages
+import PrivacyPolicyPage from './pages/PrivacyPolicy';
+import TermsOfServicePage from './pages/TermsOfService';
+import RefundPolicyPage from './pages/RefundPolicy';
+import CookiePolicyPage from './pages/CookiePolicy';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -114,7 +122,6 @@ const AppContent: React.FC = () => {
           </div>
         } />
         
-        
         <Route path="/how-it-works" element={
           <div className="min-h-screen bg-gray-50">
             <Header />
@@ -156,9 +163,66 @@ const AppContent: React.FC = () => {
           </div>
         } />
         
-       
+        <Route path="/services/tiktok" element={
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main>
+              <TikTokGrowth />
+            </main>
+            <Footer />
+          </div>
+        } />
         
-       
+        <Route path="/services/youtube" element={
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main>
+              <YouTubeGrowth />
+            </main>
+            <Footer />
+          </div>
+        } />
+        
+        {/* Legal/Policy Routes */}
+        <Route path="/privacy" element={
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main>
+              <PrivacyPolicyPage />
+            </main>
+            <Footer />
+          </div>
+        } />
+        
+        <Route path="/terms" element={
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main>
+              <TermsOfServicePage />
+            </main>
+            <Footer />
+          </div>
+        } />
+        
+        <Route path="/refund" element={
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main>
+              <RefundPolicyPage />
+            </main>
+            <Footer />
+          </div>
+        } />
+        
+        <Route path="/cookies" element={
+          <div className="min-h-screen bg-gray-50">
+            <Header />
+            <main>
+              <CookiePolicyPage />
+            </main>
+            <Footer />
+          </div>
+        } />
         
         {/* Cart & Checkout Routes */}
         <Route path="/cart" element={

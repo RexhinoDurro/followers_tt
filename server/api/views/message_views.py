@@ -12,6 +12,89 @@ from ..serializers import MessageSerializer
 
 logger = logging.getLogger(__name__)
 
+from rest_framework import generics, status, permissions
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
+from django.contrib.auth import authenticate, login, logout
+from django.db.models import Sum, Count, Q, Avg
+from django.utils import timezone
+from datetime import datetime, timedelta
+import calendar
+import logging
+from django.urls import path
+from celery import shared_task
+
+# Import serializers from the correct location
+from ..serializers import (
+    UserSerializer, UserRegistrationSerializer, UserLoginSerializer,
+    ClientSerializer, TaskSerializer, ContentPostSerializer,
+    PerformanceDataSerializer, MessageSerializer, InvoiceSerializer,
+    TeamMemberSerializer, ProjectSerializer, FileSerializer,
+    NotificationSerializer, DashboardStatsSerializer,
+    ClientDashboardStatsSerializer, BulkTaskUpdateSerializer,
+    BulkContentApprovalSerializer, FileUploadSerializer,
+    SocialMediaAccountSerializer, RealTimeMetricsSerializer
+)
+
+logger = logging.getLogger(__name__)
+
+from ..models import (
+    User, Client, Task, ContentPost, PerformanceData,
+    Message, Invoice, TeamMember, Project, File, Notification,
+    SocialMediaAccount, RealTimeMetrics
+)
+
+
+class MessageViewSet(ModelViewSet):
+    """Message management viewset"""
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return Message.objects.filter(
+            Q(sender=self.request.user) | Q(receiver=self.request.user)
+        ).order_by('-timestamp')
+    
+    def perform_create(self, serializer):
+        serializer.save(sender=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark message as read"""
+        message = self.get_object()
+        if message.receiver == request.user:
+            message.read = True
+            message.save()
+            return Response({'message': 'Message marked as read'})
+        else:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+    
+    @action(detail=False, methods=['get'])
+    def conversations(self, request):
+        """Get conversation list"""
+        # Get unique conversation partners
+        conversations = Message.objects.filter(
+            Q(sender=request.user) | Q(receiver=request.user)
+        ).values(
+            'sender', 'receiver', 'sender__first_name', 'sender__last_name',
+            'receiver__first_name', 'receiver__last_name'
+        ).distinct()
+        
+        # Process conversations to get unique partners
+        partners = set()
+        for conv in conversations:
+            if conv['sender'] != request.user.id:
+                partners.add((conv['sender'], f"{conv['sender__first_name']} {conv['sender__last_name']}"))
+            if conv['receiver'] != request.user.id:
+                partners.add((conv['receiver'], f"{conv['receiver__first_name']} {conv['receiver__last_name']}"))
+        
+        return Response([{'id': p[0], 'name': p[1]} for p in partners])
+    
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def send_message_to_admin(request):

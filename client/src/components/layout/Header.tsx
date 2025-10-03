@@ -1,23 +1,44 @@
 // components/layout/Header.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import navlogo from '../../assets/navlogo.png';
+import { ChevronDown } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [, setIsServicesOpen] = useState(false);
+  const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
   const [cartCount] = useState(0);
   const location = useLocation();
+  const servicesRef = useRef<HTMLDivElement>(null);
 
   // Helper function to check if current route is active
   const isActive = (path: string) => location.pathname === path;
+  
+  // Check if any service page is active
+  const isServiceActive = () => {
+    return location.pathname.startsWith('/services');
+  };
 
   // Close mobile menu when clicking on a link
   const handleMobileMenuClose = () => {
     setIsMenuOpen(false);
     setIsServicesOpen(false);
+    setIsMobileServicesOpen(false);
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (servicesRef.current && !servicesRef.current.contains(event.target as Node)) {
+        setIsServicesOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="shadow-sm border-b sticky top-0 z-50" style={{ backgroundColor: '#6C44B4' }}>
@@ -29,7 +50,7 @@ export const Header: React.FC = () => {
               <Link to="/" onClick={handleMobileMenuClose}>
                 <img 
                   src={navlogo} 
-                  alt="SocialBoost Pro" 
+                  alt="VisionBoost" 
                   className="h-10 w-auto sm:h-12 hover:opacity-90 transition-opacity"
                 />
               </Link>
@@ -49,18 +70,77 @@ export const Header: React.FC = () => {
               Home
             </Link>
             
-            <Link 
-              to="/services/instagram" 
-              className={`px-3 py-2 text-sm font-medium transition-colors text-white hover:text-gray-200 ${
-                isActive('/services/instagram') 
-                  ? 'border-b-2 border-white' 
-                  : ''
-              }`}
+            {/* Services Dropdown */}
+            <div 
+              ref={servicesRef}
+              className="relative"
+              onMouseEnter={() => setIsServicesOpen(true)}
+              onMouseLeave={() => setIsServicesOpen(false)}
             >
-              Services
-            </Link>
-            
-           
+              <button
+                className={`px-3 py-2 text-sm font-medium transition-colors text-white hover:text-gray-200 flex items-center ${
+                  isServiceActive() 
+                    ? 'border-b-2 border-white' 
+                    : ''
+                }`}
+              >
+                Services
+                <ChevronDown className={`w-4 h-4 ml-1 transition-transform duration-200 ${isServicesOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {isServicesOpen && (
+                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                  <Link
+                    to="/services/instagram"
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                    onClick={() => setIsServicesOpen(false)}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 mr-3 flex-shrink-0">
+                        <img src="/instagram.png" alt="Instagram" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">Instagram Growth</div>
+                        <div className="text-xs text-gray-500">Grow your Instagram</div>
+                      </div>
+                    </div>
+                  </Link>
+                  
+                  <Link
+                    to="/services/tiktok"
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                    onClick={() => setIsServicesOpen(false)}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 mr-3 flex-shrink-0">
+                        <img src="/tiktok.png" alt="TikTok" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">TikTok Growth</div>
+                        <div className="text-xs text-gray-500">Go viral on TikTok</div>
+                      </div>
+                    </div>
+                  </Link>
+                  
+                  <Link
+                    to="/services/youtube"
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                    onClick={() => setIsServicesOpen(false)}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 mr-3 flex-shrink-0">
+                        <img src="/youtube.png" alt="YouTube" className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">YouTube Growth</div>
+                        <div className="text-xs text-gray-500">Grow your channel</div>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              )}
+            </div>
             
             <Link 
               to="/how-it-works" 
@@ -148,18 +228,64 @@ export const Header: React.FC = () => {
               Home
             </Link>
             
-            <Link 
-              to="/services/instagram" 
-              className={`block px-3 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
-                isActive('/services/instagram') 
-                  ? 'bg-white text-purple-800' 
-                  : 'text-white hover:bg-white hover:text-purple-800'
-              }`}
-              onClick={handleMobileMenuClose}
-            >
-              Services
-            </Link>
-            
+            {/* Mobile Services Dropdown */}
+            <div>
+              <button
+                onClick={() => setIsMobileServicesOpen(!isMobileServicesOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
+                  isServiceActive() 
+                    ? 'bg-white text-purple-800' 
+                    : 'text-white hover:bg-white hover:text-purple-800'
+                }`}
+              >
+                <span>Services</span>
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isMobileServicesOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Mobile Services Submenu */}
+              {isMobileServicesOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  <Link
+                    to="/services/instagram"
+                    className="block px-3 py-2 text-sm text-white hover:bg-white hover:text-purple-800 rounded-md transition-all duration-200"
+                    onClick={handleMobileMenuClose}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-6 h-6 mr-2">
+                        <img src="/instagram.png" alt="Instagram" className="w-full h-full object-contain" />
+                      </div>
+                      Instagram Growth
+                    </div>
+                  </Link>
+                  
+                  <Link
+                    to="/services/tiktok"
+                    className="block px-3 py-2 text-sm text-white hover:bg-white hover:text-purple-800 rounded-md transition-all duration-200"
+                    onClick={handleMobileMenuClose}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-6 h-6 mr-2">
+                        <img src="/tiktok.png" alt="TikTok" className="w-full h-full object-contain" />
+                      </div>
+                      TikTok Growth
+                    </div>
+                  </Link>
+                  
+                  <Link
+                    to="/services/youtube"
+                    className="block px-3 py-2 text-sm text-white hover:bg-white hover:text-purple-800 rounded-md transition-all duration-200"
+                    onClick={handleMobileMenuClose}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-6 h-6 mr-2">
+                        <img src="/youtube.png" alt="YouTube" className="w-full h-full object-contain" />
+                      </div>
+                      YouTube Growth
+                    </div>
+                  </Link>
+                </div>
+              )}
+            </div>
             
             <Link 
               to="/how-it-works" 

@@ -26,7 +26,7 @@ from .views import (
 
 # Import auth views
 try:
-    from .views.auth_views import update_profile, change_password
+    from .views.profile_views import update_profile, change_password
     AUTH_VIEWS_AVAILABLE = True
 except ImportError:
     AUTH_VIEWS_AVAILABLE = False
