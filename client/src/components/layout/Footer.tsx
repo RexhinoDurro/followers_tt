@@ -53,7 +53,7 @@ export const Footer: React.FC = () => {
               <li>
                 <Link to="/services/youtube" className="hover:text-purple-400 transition-colors">
                   YouTube Growth
-              
+                </Link>
               </li>
             </ul>
           </div>
