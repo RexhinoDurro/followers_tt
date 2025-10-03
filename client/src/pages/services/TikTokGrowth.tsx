@@ -5,9 +5,7 @@ import {
   Play,
   Heart,
   Users,
-  TrendingUp,
   BarChart3,
-  MessageCircle,
   Eye,
   Star,
   CheckCircle,
@@ -19,13 +17,12 @@ import {
   Music,
   Award,
   Shield,
-  Clock,
   ArrowRight,
   ChevronDown,
   ChevronUp,
   Flame,
   Sparkles,
-  Camera
+
 } from 'lucide-react';
 
 const TikTokGrowthPage: React.FC = () => {

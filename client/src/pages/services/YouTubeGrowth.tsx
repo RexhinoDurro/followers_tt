@@ -3,19 +3,15 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Play,
-  Heart,
+ 
   Users,
   TrendingUp,
   BarChart3,
-  MessageCircle,
   Eye,
   Star,
   CheckCircle,
   Zap,
-  Target,
   Calendar,
-  Video,
-  Hash,
   Search,
   Award,
   Shield,
@@ -26,9 +22,7 @@ import {
   Camera,
   Edit3,
   DollarSign,
-  Mic,
   Monitor,
-  FileText
 } from 'lucide-react';
 
 const YouTubeGrowthPage: React.FC = () => {
