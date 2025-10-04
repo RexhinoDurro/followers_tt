@@ -1,10 +1,11 @@
 from rest_framework import generics, status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.contrib.auth import authenticate, login, logout
 from django.db.models import Sum, Count, Q, Avg
 from django.utils import timezone
@@ -80,13 +81,25 @@ def logout_view(request):
 
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def current_user_view(request):
     """Get or update current user profile"""
     if request.method == 'GET':
         return Response(UserSerializer(request.user).data)
     
     elif request.method == 'PATCH':
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        user = request.user
+        
+        # Handle avatar upload separately
+        if 'avatar' in request.FILES:
+            # Delete old avatar if exists
+            if user.avatar:
+                user.avatar.delete(save=False)
+            user.avatar = request.FILES['avatar']
+            user.save()
+        
+        # Update other fields
+        serializer = UserSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -94,10 +107,21 @@ def current_user_view(request):
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def update_profile(request):
-    """Update user profile"""
+    """Update user profile including avatar"""
     try:
         user = request.user
+        
+        # Handle avatar upload separately
+        if 'avatar' in request.FILES:
+            # Delete old avatar if exists
+            if user.avatar:
+                user.avatar.delete(save=False)
+            user.avatar = request.FILES['avatar']
+            user.save()
+        
+        # Update other fields
         serializer = UserSerializer(user, data=request.data, partial=True)
         
         if serializer.is_valid():

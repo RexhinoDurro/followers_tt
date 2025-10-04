@@ -502,6 +502,40 @@ class ApiService {
     });
   }
 
+  // Update profile with avatar
+  async updateProfileWithAvatar(profileData: any, avatarFile?: File) {
+    const formData = new FormData();
+    
+    // Add profile fields
+    Object.keys(profileData).forEach(key => {
+      if (profileData[key] !== null && profileData[key] !== undefined) {
+        formData.append(key, profileData[key]);
+      }
+    });
+    
+    // Add avatar if provided
+    if (avatarFile) {
+      formData.append('avatar', avatarFile);
+    }
+
+    const url = `${this.baseURL}/auth/me/`;
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Token ${this.token}`,
+        // Don't set Content-Type for FormData
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to update profile');
+    }
+
+    return await response.json();
+  }
+
   // Change password
   async changePassword(data: { current_password: string; new_password: string }) {
     return await this.request('/auth/change-password/', {

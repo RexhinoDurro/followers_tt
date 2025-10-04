@@ -16,7 +16,7 @@ const ClientSettings: React.FC = () => {
     last_name: user?.last_name || '',
     email: user?.email || '',
     company: user?.company || '',
-    bio: ''
+    bio: user?.bio || ''
   });
 
   // Password form state
@@ -69,20 +69,20 @@ const ClientSettings: React.FC = () => {
     setSuccess('');
 
     try {
-      // Update profile data
-      await ApiService.updateProfile({
-        first_name: profileData.first_name,
-        last_name: profileData.last_name,
-        company: profileData.company,
-      });
-
-      // TODO: Upload photo if changed
-      if (photoFile) {
-        // Implement photo upload logic here
-        console.log('Photo upload:', photoFile);
-      }
+      const updatedProfile = await ApiService.updateProfileWithAvatar(
+        {
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          company: profileData.company,
+          bio: profileData.bio,
+        },
+        photoFile || undefined
+      );
 
       setSuccess('Profile updated successfully!');
+      if (updatedProfile.avatar) {
+        setProfilePhoto(updatedProfile.avatar);
+      }
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to update profile');

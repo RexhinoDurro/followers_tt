@@ -11,6 +11,7 @@ export interface AuthUser {
   role: 'admin' | 'client';
   company?: string;
   avatar?: string;
+  bio?: string;
   // Computed property for full name
   name?: string;
 }
