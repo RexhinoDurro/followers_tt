@@ -12,10 +12,21 @@ from .models import (
 
 class UserSerializer(serializers.ModelSerializer):
     """User serializer for authentication and profile"""
+    avatar = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'company', 'avatar', 'bio']
         read_only_fields = ['id']
+    
+    def get_avatar(self, obj):
+        """Return full URL for avatar"""
+        if obj.avatar:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.avatar.url)
+            return obj.avatar.url
+        return None
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """User registration serializer - FIXED to always create client profiles"""
