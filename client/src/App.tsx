@@ -13,7 +13,7 @@ import HomePage from './pages/HomePage';
 import AboutUs from './pages/AboutUs';
 import Contact from './pages/Contact';
 import HowItWorksPage from './pages/HowItWorksPage';
-import CartPage from './pages/CartPage';
+
 import OrderConfirmation from './pages/OrderConfirmation';
 
 // Import Service Pages
@@ -229,7 +229,7 @@ const AppContent: React.FC = () => {
           <div className="min-h-screen bg-gray-50">
             <Header />
             <main>
-              <CartPage />
+             
             </main>
             <Footer />
           </div>

@@ -3,173 +3,173 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Play,
- 
+  Heart,
   Users,
   TrendingUp,
   BarChart3,
+  MessageCircle,
   Eye,
   Star,
   CheckCircle,
   Zap,
+  Target,
   Calendar,
-  Search,
+  Video,
+  Hash,
   Award,
   Shield,
   Clock,
   ArrowRight,
   ChevronDown,
   ChevronUp,
-  Camera,
-  Edit3,
-  DollarSign,
-  Monitor,
+  ShoppingCart
 } from 'lucide-react';
 
 const YouTubeGrowthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'features' | 'process' | 'results'>('features');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  const followerPackages = [
+    { followers: '1K', price: 20 },
+    { followers: '3K', price: 50 },
+    { followers: '5K', price: 80 },
+    { followers: '10K', price: 140 },
+    { followers: '15K', price: 190 },
+    { followers: '20K', price: 250 }
+  ];
+
   const plans = [
     {
-      name: 'Creator Starter',
-      price: 49,
-      subscribers: '200-500',
+      name: 'Starter',
+      price: 100,
       features: [
-        'Video SEO optimization',
-        'Thumbnail design tips',
-        'Title optimization',
-        'Basic keyword research',
-        'Weekly performance reports',
-        'Email support'
+        '12 posts per month',
+        '12 interactive stories',
+        'Hashtag research',
+        'Monthly reports',
+        'ideal for small businesses',
       ]
     },
     {
-      name: 'Creator Growth',
-      price: 99,
-      subscribers: '500-1,500',
+      name: 'Pro',
+      price: 250,
       features: [
-        'Advanced SEO strategies',
-        'Custom thumbnail designs',
-        'Video script optimization',
-        'Playlist organization',
-        'Community tab management',
-        'Analytics deep dives',
-        'Priority support',
-        'Bi-weekly strategy calls'
+        '20 posts + reels',
+        'Monthly promotional areas',
+        'boost strategies',
+        'Bio optimization',
+        'report + recommendations',
+        'Story engagement boost',
+        'aggressive boosting',
       ],
       popular: true
     },
     {
-      name: 'Creator Pro',
-      price: 199,
-      subscribers: '1,500-5,000',
+      name: 'Premium',
+      price: 400,
       features: [
-        'Full channel management',
-        'Professional video editing',
-        'Brand deal facilitation',
-        'Monetization optimization',
-        'Live streaming setup',
-        'YouTube Shorts strategy',
-        '24/7 priority support',
-        'Weekly video calls',
-        'Custom analytics dashboard'
+        'YouTube + Instagram + Facebook',
+        '30 posts(design,reels carousel)',
+        'Advertising on a budget',
+        'Influencer outreach assistance',
+        'full and professional management',
       ]
     }
   ];
 
   const growthMetrics = [
     { icon: Users, label: 'Subscribers', value: '50K+', description: 'Real subscribers gained' },
-    { icon: Eye, label: 'Views', value: '10M+', description: 'Monthly video views' },
-    { icon: Clock, label: 'Watch Time', value: '500K+', description: 'Hours watched' },
-    { icon: DollarSign, label: 'Revenue', value: '$25K+', description: 'Monthly earnings' }
+    { icon: Heart, label: 'Engagement', value: '300%', description: 'Average increase' },
+    { icon: Eye, label: 'Views', value: '2M+', description: 'Monthly video views' },
+    { icon: BarChart3, label: 'Growth Rate', value: '150%', description: 'Faster than average' }
   ];
 
   const features = [
     {
-      icon: Search,
-      title: 'YouTube SEO Mastery',
-      description: 'Dominate YouTube search with advanced SEO strategies and keyword optimization.',
-      details: ['Keyword research and analysis', 'Video tags optimization', 'Description writing that converts']
+      icon: Target,
+      title: 'Targeted Subscriber Growth',
+      description: 'We attract real, engaged subscribers who are genuinely interested in your content and niche.',
+      details: ['Audience research and targeting', 'Interest-based subscriber acquisition', 'Geographic targeting options']
     },
     {
-      icon: Camera,
-      title: 'Thumbnail Design',
-      description: 'Create eye-catching thumbnails that boost click-through rates and views.',
-      details: ['A/B testing different designs', 'Psychology-based thumbnail creation', 'Brand consistency guidelines']
+      icon: Hash,
+      title: 'Advanced SEO Strategy',
+      description: 'Our AI-powered keyword research ensures maximum discoverability for your videos.',
+      details: ['Custom keyword sets for each video', 'Trending topic identification', 'Competitor keyword analysis']
     },
     {
-      icon: Edit3,
-      title: 'Content Strategy',
-      description: 'Develop a winning content strategy that keeps viewers coming back for more.',
-      details: ['Content calendar planning', 'Series and playlist strategy', 'Trending topic identification']
+      icon: Video,
+      title: 'Content Optimization',
+      description: 'Get expert guidance on creating videos that drive engagement and growth.',
+      details: ['Upload timing optimization', 'Title and description writing guidance', 'Thumbnail design advice']
     },
     {
-      icon: Monitor,
-      title: 'Channel Optimization',
-      description: 'Optimize every aspect of your channel for maximum growth and engagement.',
-      details: ['Channel art and branding', 'About section optimization', 'Channel trailer creation']
-    },
-    {
-      icon: DollarSign,
-      title: 'Monetization Support',
-      description: 'Maximize your YouTube revenue through multiple monetization strategies.',
-      details: ['AdSense optimization', 'Sponsorship opportunities', 'Merchandise integration']
+      icon: MessageCircle,
+      title: 'Engagement Management',
+      description: 'We help manage and boost your engagement to increase visibility and reach.',
+      details: ['Strategic commenting and community posts', 'Audience engagement tactics', 'Community interaction']
     },
     {
       icon: BarChart3,
-      title: 'Advanced Analytics',
-      description: 'Track your growth with detailed YouTube Analytics and actionable insights.',
-      details: ['Performance tracking dashboard', 'Audience retention analysis', 'Revenue optimization reports']
+      title: 'Analytics & Reporting',
+      description: 'Track your growth with detailed analytics and actionable insights.',
+      details: ['Weekly growth reports', 'Engagement rate analysis', 'Audience insights dashboard']
+    },
+    {
+      icon: Shield,
+      title: '100% Safe & Compliant',
+      description: 'All our methods are organic and comply with YouTube\'s terms of service.',
+      details: ['No bots or fake accounts', 'Organic growth methods only', 'Account safety guaranteed']
     }
   ];
 
   const testimonials = [
     {
-      name: 'Marcus Johnson',
-      handle: '@TechReviewsWithMarcus',
-      image: '👨‍💻',
-      text: 'Went from 10K to 250K subscribers in 8 months! My tech reviews are now getting millions of views.',
-      subscribers: '250K subscribers',
-      growth: '+2,400% growth'
+      name: 'Sarah Johnson',
+      handle: '@sarahjcreates',
+      image: '👩‍🎨',
+      text: 'Grew from 2K to 25K subscribers in 3 months! The engagement quality is incredible.',
+      followers: '25K subscribers',
+      growth: '+2300% growth'
     },
     {
-      name: 'Sarah Williams',
-      handle: '@CookingWithSarah',
-      image: '👩‍🍳',
-      text: 'The SEO strategies are incredible! My cooking videos rank #1 for competitive keywords.',
-      subscribers: '180K subscribers',
-      growth: '+1,700% growth'
-    },
-    {
-      name: 'David Chen',
-      handle: '@FitnessWithDavid',
+      name: 'Mike Rodriguez',
+      handle: '@mikefit',
       image: '💪',
-      text: 'Amazing results! My fitness channel is now monetized and generating $15K+ per month.',
-      subscribers: '320K subscribers',
-      growth: '+3,100% growth'
+      text: 'Best investment for my fitness channel. Real subscribers who actually engage with my content.',
+      followers: '45K subscribers',
+      growth: '+1800% growth'
+    },
+    {
+      name: 'Emma Thompson',
+      handle: '@emmastyle',
+      image: '👗',
+      text: 'Amazing results! My fashion channel exploded and brands started reaching out.',
+      followers: '85K subscribers',
+      growth: '+4200% growth'
     }
   ];
 
   const faqs = [
     {
-      question: 'How long does it take to see results on YouTube?',
-      answer: 'YouTube growth typically takes longer than other platforms, but most clients see initial improvements within 2-4 weeks. Significant subscriber growth usually happens within 2-3 months with consistent implementation of our strategies.'
+      question: 'How quickly will I see results?',
+      answer: 'Most clients see initial growth within 7-14 days. Significant results typically appear within the first month, with exponential growth continuing over time.'
     },
     {
-      question: 'Do you help with video editing and production?',
-      answer: 'Yes! Our higher-tier plans include video editing assistance, thumbnail creation, and production guidance to help you create professional-quality content that performs well.'
+      question: 'Are the subscribers real people?',
+      answer: 'Yes! We only use organic methods to attract real, active YouTube users who are genuinely interested in your content and niche.'
     },
     {
-      question: 'Will you help me get monetized on YouTube?',
-      answer: 'Absolutely! We help you reach the 1,000 subscriber and 4,000 watch hour requirements for monetization, and then optimize your revenue streams including AdSense, sponsorships, and merchandise.'
+      question: 'Is this safe for my YouTube account?',
+      answer: 'Absolutely. All our methods are 100% compliant with YouTube\'s terms of service. We use only organic growth strategies to protect your account.'
     },
     {
-      question: 'Do you provide thumbnail design services?',
-      answer: 'Yes! We create custom, high-converting thumbnails for your videos. Our thumbnails are designed using psychology-based principles to maximize click-through rates and views.'
+      question: 'What information do you need from me?',
+      answer: 'We only need your YouTube channel URL and basic information about your target audience and goals. We never ask for passwords or sensitive information.'
     },
     {
-      question: 'Can you help with YouTube Shorts strategy?',
-      answer: 'Definitely! YouTube Shorts is a powerful tool for growth. We develop comprehensive Shorts strategies that complement your long-form content and drive subscribers to your main videos.'
+      question: 'Can I target specific demographics?',
+      answer: 'Yes! We can target subscribers based on location, interests, age, gender, and similar channels to ensure you get the most relevant audience.'
     }
   ];
 
@@ -181,16 +181,16 @@ const YouTubeGrowthPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <div className="flex items-center mb-6">
-                <Play className="w-12 h-12 mr-4 bg-white text-red-600 rounded-lg p-2" />
+                <Play className="w-12 h-12 mr-4" />
                 <span className="text-2xl font-bold">YouTube Growth</span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold mb-6">
-                Scale Your
-                <span className="block text-yellow-300">YouTube Channel</span>
+                Grow Your YouTube
+                <span className="block text-yellow-300">Organically</span>
               </h1>
               <p className="text-xl mb-8 leading-relaxed">
-                Transform your YouTube channel into a thriving business. Our proven strategies help you gain 
-                subscribers, increase views, and maximize revenue.
+                Get real, engaged subscribers who love your content. Our proven strategies help you build 
+                an authentic YouTube presence that converts.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Link 
@@ -213,8 +213,8 @@ const YouTubeGrowthPage: React.FC = () => {
                   <span>100% Safe</span>
                 </div>
                 <div className="flex items-center">
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  <span>Monetization Focus</span>
+                  <Users className="w-4 h-4 mr-2" />
+                  <span>Real Subscribers</span>
                 </div>
                 <div className="flex items-center">
                   <Award className="w-4 h-4 mr-2" />
@@ -223,15 +223,12 @@ const YouTubeGrowthPage: React.FC = () => {
               </div>
             </div>
             
-            {/* YouTube Stats Dashboard Mockup */}
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-              <h3 className="text-xl font-bold mb-6 flex items-center">
-                <BarChart3 className="w-5 h-5 mr-2 text-yellow-400" />
-                Channel Analytics Dashboard
-              </h3>
+            {/* Stats Dashboard Mockup */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+              <h3 className="text-xl font-bold mb-6">Live Growth Dashboard</h3>
               <div className="grid grid-cols-2 gap-4">
                 {growthMetrics.map((metric, index) => (
-                  <div key={index} className="bg-white/20 rounded-lg p-4 backdrop-blur-sm">
+                  <div key={index} className="bg-white/20 rounded-lg p-4">
                     <div className="flex items-center mb-2">
                       <metric.icon className="w-5 h-5 mr-2" />
                       <span className="text-sm font-medium">{metric.label}</span>
@@ -242,10 +239,10 @@ const YouTubeGrowthPage: React.FC = () => {
                 ))}
               </div>
               <div className="mt-6 flex items-center justify-between text-sm">
-                <span>Revenue This Month</span>
+                <span>Growth Rate</span>
                 <div className="flex items-center text-green-300">
                   <TrendingUp className="w-4 h-4 mr-1" />
-                  <span>+45% vs last month</span>
+                  <span>+23% this week</span>
                 </div>
               </div>
             </div>
@@ -253,13 +250,15 @@ const YouTubeGrowthPage: React.FC = () => {
         </div>
       </section>
 
+      
+
       {/* Features Tabs Section */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">How We Scale Your YouTube Channel</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">How We Grow Your YouTube</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our comprehensive YouTube growth strategy focuses on sustainable growth and monetization
+              Our comprehensive approach combines proven strategies with cutting-edge technology
             </p>
           </div>
 
@@ -317,26 +316,26 @@ const YouTubeGrowthPage: React.FC = () => {
                   {[
                     {
                       step: 1,
-                      title: 'Channel Audit & Analysis',
-                      description: 'Comprehensive analysis of your channel, content performance, and growth opportunities.',
-                      duration: '2-3 days'
+                      title: 'Account Analysis',
+                      description: 'We analyze your current YouTube channel and identify growth opportunities.',
+                      duration: '1-2 days'
                     },
                     {
                       step: 2,
-                      title: 'SEO & Content Strategy',
-                      description: 'Develop keyword-optimized content strategy and SEO plan for maximum discoverability.',
-                      duration: '3-5 days'
+                      title: 'Strategy Development',
+                      description: 'Create a custom growth plan tailored to your niche and target audience.',
+                      duration: '2-3 days'
                     },
                     {
                       step: 3,
-                      title: 'Content Creation & Optimization',
-                      description: 'Implement optimized titles, thumbnails, descriptions, and content structure.',
+                      title: 'Growth Implementation',
+                      description: 'Execute the strategy using our proven organic growth methods.',
                       duration: 'Ongoing'
                     },
                     {
                       step: 4,
-                      title: 'Growth Tracking & Scaling',
-                      description: 'Monitor performance, optimize based on analytics, and scale successful strategies.',
+                      title: 'Monitor & Optimize',
+                      description: 'Continuously track performance and optimize for maximum growth.',
                       duration: 'Weekly'
                     }
                   ].map((step) => (
@@ -362,45 +361,42 @@ const YouTubeGrowthPage: React.FC = () => {
             {activeTab === 'results' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                 <div>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-6">YouTube Success Metrics</h3>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-6">Proven Results</h3>
                   <div className="space-y-6">
                     <div className="flex items-center">
-                      <div className="bg-red-100 p-3 rounded-full mr-4">
-                        <Users className="w-6 h-6 text-red-600" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900">800% Average Growth</div>
-                        <div className="text-gray-600">In subscribers within 6 months</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="bg-yellow-100 p-3 rounded-full mr-4">
-                        <Eye className="w-6 h-6 text-yellow-600" />
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900">1,000% View Increase</div>
-                        <div className="text-gray-600">Monthly video views growth</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center">
                       <div className="bg-green-100 p-3 rounded-full mr-4">
-                        <DollarSign className="w-6 h-6 text-green-600" />
+                        <TrendingUp className="w-6 h-6 text-green-600" />
                       </div>
                       <div>
-                        <div className="text-2xl font-bold text-gray-900">$25K+ Monthly Revenue</div>
-                        <div className="text-gray-600">Average monetization success</div>
+                        <div className="text-2xl font-bold text-gray-900">500% Average Growth</div>
+                        <div className="text-gray-600">In subscribers within 90 days</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="bg-blue-100 p-3 rounded-full mr-4">
+                        <Heart className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-gray-900">300% Engagement Boost</div>
+                        <div className="text-gray-600">Higher likes, comments, and shares</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="bg-purple-100 p-3 rounded-full mr-4">
+                        <Eye className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-gray-900">10x Reach Increase</div>
+                        <div className="text-gray-600">More people discovering your content</div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl p-8 text-white">
-                  <h4 className="text-xl font-bold mb-6 flex items-center">
-                    <Award className="w-5 h-5 mr-2 text-yellow-400" />
-                    Creator Success Stories
-                  </h4>
+                  <h4 className="text-xl font-bold mb-6">Success Stories</h4>
                   <div className="space-y-4">
                     {testimonials.slice(0, 2).map((testimonial, index) => (
-                      <div key={index} className="bg-white/20 rounded-lg p-4 backdrop-blur-sm">
+                      <div key={index} className="bg-white/20 rounded-lg p-4">
                         <div className="flex items-center mb-2">
                           <span className="text-2xl mr-3">{testimonial.image}</span>
                           <div>
@@ -410,8 +406,8 @@ const YouTubeGrowthPage: React.FC = () => {
                         </div>
                         <p className="text-sm mb-2">"{testimonial.text}"</p>
                         <div className="flex justify-between text-xs">
-                          <span>{testimonial.subscribers}</span>
-                          <span className="text-yellow-300">{testimonial.growth}</span>
+                          <span>{testimonial.followers}</span>
+                          <span className="text-green-300">{testimonial.growth}</span>
                         </div>
                       </div>
                     ))}
@@ -427,8 +423,8 @@ const YouTubeGrowthPage: React.FC = () => {
       <section id="pricing" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Choose Your YouTube Growth Plan</h2>
-            <p className="text-xl text-gray-600">Start scaling your channel and maximizing revenue today</p>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Choose Your Growth Plan</h2>
+            <p className="text-xl text-gray-600">Start growing your YouTube today with our proven strategies</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -436,12 +432,12 @@ const YouTubeGrowthPage: React.FC = () => {
               <div
                 key={index}
                 className={`relative bg-white rounded-2xl shadow-lg ${
-                  plan.popular ? 'ring-2 ring-red-500 transform scale-105' : ''
+                  plan.popular ? 'ring-2 ring-red-600 transform scale-105' : ''
                 } transition-all duration-300 hover:shadow-xl`}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-red-500 to-red-700 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center">
+                    <span className="bg-gradient-to-r from-red-600 to-red-800 text-white px-4 py-2 rounded-full text-sm font-medium flex items-center">
                       <Star className="w-4 h-4 mr-1" />
                       Most Popular
                     </span>
@@ -450,12 +446,8 @@ const YouTubeGrowthPage: React.FC = () => {
 
                 <div className="p-8">
                   <div className="text-center mb-8">
-                    <div className="bg-red-600 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-4">
-                      <Play className="w-8 h-8 text-white" />
-                    </div>
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
                     <div className="text-4xl font-bold text-gray-900 mb-2">${plan.price}</div>
-                    <div className="text-gray-600 mb-4">{plan.subscribers} subscribers/month</div>
                   </div>
 
                   <ul className="space-y-3 mb-8">
@@ -471,11 +463,11 @@ const YouTubeGrowthPage: React.FC = () => {
                     to="/auth"
                     className={`w-full py-3 px-4 rounded-lg font-semibold text-center transition-colors duration-200 block ${
                       plan.popular
-                        ? 'bg-gradient-to-r from-red-500 to-red-700 text-white hover:from-red-600 hover:to-red-800'
+                        ? 'bg-gradient-to-r from-red-600 to-red-800 text-white hover:from-red-700 hover:to-red-900'
                         : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}
                   >
-                    Start Growing
+                    Get Started
                   </Link>
                 </div>
               </div>
@@ -483,13 +475,48 @@ const YouTubeGrowthPage: React.FC = () => {
           </div>
         </div>
       </section>
+      
+      {/* Follower Packages Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Subscriber Packages</h2>
+            <p className="text-xl text-gray-600">Choose the perfect package to boost your YouTube channel</p>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {followerPackages.map((pkg, index) => (
+              <div
+                key={index}
+                className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:border-red-600 hover:shadow-xl transition-all duration-300"
+              >
+                <div className="text-center">
+                  <div className="bg-gradient-to-br from-red-600 to-red-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-2">{pkg.followers}</h3>
+                  <p className="text-gray-600 mb-4">Subscribers</p>
+                  <div className="text-4xl font-bold text-red-600 mb-6">${pkg.price}</div>
+                  <Link
+                    to="/auth"
+                    className="w-full bg-gradient-to-r from-red-600 to-red-800 text-white py-3 px-6 rounded-lg font-semibold hover:from-red-700 hover:to-red-900 transition-colors flex items-center justify-center"
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Get Started
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      
       {/* Testimonials Section */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">YouTube Success Stories</h2>
-            <p className="text-xl text-gray-600">See how our creators achieved massive growth and monetization</p>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Success Stories</h2>
+            <p className="text-xl text-gray-600">See how our clients transformed their YouTube channel</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -504,7 +531,7 @@ const YouTubeGrowthPage: React.FC = () => {
                 </div>
                 <p className="text-gray-600 mb-4">"{testimonial.text}"</p>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">{testimonial.subscribers}</span>
+                  <span className="text-sm text-gray-500">{testimonial.followers}</span>
                   <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
                     {testimonial.growth}
                   </span>
@@ -520,14 +547,14 @@ const YouTubeGrowthPage: React.FC = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-            <p className="text-xl text-gray-600">Everything you need to know about YouTube channel growth</p>
+            <p className="text-xl text-gray-600">Everything you need to know about our YouTube growth service</p>
           </div>
 
           <div className="space-y-4">
             {faqs.map((faq, index) => (
               <div key={index} className="bg-gray-50 rounded-lg">
                 <button
-                  className="w-full text-left p-6 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full text-left p-6 focus:outline-none focus:ring-2 focus:ring-red-600"
                   onClick={() => setOpenFaq(openFaq === index ? null : index)}
                 >
                   <div className="flex justify-between items-center">
@@ -554,10 +581,10 @@ const YouTubeGrowthPage: React.FC = () => {
       <section className="py-20 bg-gradient-to-r from-red-600 to-red-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to Scale Your YouTube Channel?
+            Ready to Grow Your YouTube?
           </h2>
           <p className="text-xl text-white mb-8 max-w-3xl mx-auto">
-            Join thousands of successful YouTube creators who have transformed their channels into thriving businesses
+            Join thousands of successful creators and businesses who have transformed their YouTube presence
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -571,17 +598,17 @@ const YouTubeGrowthPage: React.FC = () => {
               to="/contact"
               className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-red-600 transition-colors"
             >
-              Get Custom Strategy
+              Get Custom Quote
             </Link>
           </div>
           <div className="mt-8 flex items-center justify-center space-x-8 text-sm text-white/80">
             <div className="flex items-center">
               <Clock className="w-4 h-4 mr-2" />
-              <span>Results in 2-4 weeks</span>
+              <span>Results in 7-14 days</span>
             </div>
             <div className="flex items-center">
-              <DollarSign className="w-4 h-4 mr-2" />
-              <span>Monetization focused</span>
+              <Shield className="w-4 h-4 mr-2" />
+              <span>100% safe methods</span>
             </div>
             <div className="flex items-center">
               <Award className="w-4 h-4 mr-2" />

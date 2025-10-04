@@ -1,4 +1,4 @@
-// client/src/dashboard/DashboardRouter.tsx
+// client/src/dashboard/DashboardRouter.tsx - Updated with Client Settings
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from './DashboardLayout';
@@ -11,7 +11,6 @@ import AdminTasks from './admin/AdminTasks';
 import AdminContent from './admin/AdminContent.tsx';
 import { AdminPerformance } from './admin/AdminPerformance';
 import AdminMessages from './admin/AdminMessages.tsx';
-// If the file is named 'AdminInvoices.tsx', update the import:
 import AdminInvoices from './admin/AdminInvoices.tsx';
 import AdminSettings from './admin/AdminSettings.tsx';
 
@@ -20,8 +19,8 @@ import ClientOverview from './client/ClientOverview';
 import ClientContent from './client/ClientContent.tsx';
 import ClientPerformance from './client/ClientPerformance.tsx';
 import ClientMessages from './client/ClientMessages.tsx';
-// If the file is named 'ClientBilling.tsx', update the import:
 import ClientBilling from './client/ClientBilling.tsx';
+import ClientSettings from './client/ClientSettings'; // Add this import
 
 export const DashboardRouter: React.FC = () => {
   const { user, logout } = useAuth();
@@ -58,7 +57,8 @@ export const DashboardRouter: React.FC = () => {
     content: <ClientContent />,
     performance: <ClientPerformance />,
     messages: <ClientMessages />,
-    billing: <ClientBilling />
+    billing: <ClientBilling />,
+    settings: <ClientSettings /> // Add settings page
   };
 
   const pages = user.role === 'admin' ? adminPages : clientPages;

@@ -21,35 +21,43 @@ import {
   Clock,
   ArrowRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ShoppingCart
 } from 'lucide-react';
 
 const InstagramGrowthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'features' | 'process' | 'results'>('features');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  const followerPackages = [
+    { followers: '1K', price: 20 },
+    { followers: '3K', price: 50 },
+    { followers: '5K', price: 80 },
+    { followers: '10K', price: 140 },
+    { followers: '15K', price: 190 },
+    { followers: '20K', price: 250 }
+  ];
+
   const plans = [
     {
       name: 'Starter',
       price: 100,
-   
       features: [
         '12 posts per month',
         '12 interactive stories',
         'Hashtag research',
         'Monthly reports',
-        'ideal for small buisnesses',
+        'ideal for small businesses',
       ]
     },
     {
       name: 'Pro',
       price: 250,
- 
       features: [
         '20 posts + reels',
         'Monthly promotional areas',
         'boost strategies',
-        'Blo optimization',
+        'Bio optimization',
         'report + recommendations',
         'Story engagement boost',
         'aggressive boosting',
@@ -59,14 +67,12 @@ const InstagramGrowthPage: React.FC = () => {
     {
       name: 'Premium',
       price: 400,
-      
       features: [
         'Instagram + Facebook + TikTok',
-        '30 posts(design,reels carouse)',
+        '30 posts(design,reels carousel)',
         'Advertising on a budget',
         'Influencer outreach assistance',
         'full and professional management',
-       
       ]
     }
   ];
@@ -244,6 +250,7 @@ const InstagramGrowthPage: React.FC = () => {
         </div>
       </section>
 
+      
       {/* Features Tabs Section */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -440,7 +447,6 @@ const InstagramGrowthPage: React.FC = () => {
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
                     <div className="text-4xl font-bold text-gray-900 mb-2">${plan.price}</div>
-                    <div className="text-gray-600 mb-4">{} followers/month</div>
                   </div>
 
                   <ul className="space-y-3 mb-8">
@@ -460,6 +466,41 @@ const InstagramGrowthPage: React.FC = () => {
                         : 'bg-gray-900 text-white hover:bg-gray-800'
                     }`}
                   >
+                    Get Started
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      
+      {/* Follower Packages Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Follower Packages</h2>
+            <p className="text-xl text-gray-600">Choose the perfect package to boost your Instagram presence</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {followerPackages.map((pkg, index) => (
+              <div
+                key={index}
+                className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:border-pink-500 hover:shadow-xl transition-all duration-300"
+              >
+                <div className="text-center">
+                  <div className="bg-gradient-to-br from-pink-500 to-purple-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-gray-900 mb-2">{pkg.followers}</h3>
+                  <p className="text-gray-600 mb-4">Followers</p>
+                  <div className="text-4xl font-bold text-pink-600 mb-6">${pkg.price}</div>
+                  <Link
+                    to="/auth"
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transition-colors flex items-center justify-center"
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
                     Get Started
                   </Link>
                 </div>

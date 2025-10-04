@@ -1,4 +1,4 @@
-// client/src/dashboard/DashboardLayout.tsx - Updated with Working Notifications
+// client/src/dashboard/DashboardLayout.tsx - Updated with Client Settings in Navigation
 import React, { useState } from 'react';
 import { 
   DollarSign, 
@@ -53,7 +53,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
     { name: 'Content', href: '#content', icon: FileText },
     { name: 'Performance', href: '#performance', icon: TrendingUp },
     { name: 'Messages', href: '#messages', icon: MessageSquare },
-    { name: 'Billing', href: '#billing', icon: DollarSign }
+    { name: 'Billing', href: '#billing', icon: DollarSign },
+    { name: 'Settings', href: '#settings', icon: Settings } // Added Settings
   ];
 
   // Get display name with fallback
@@ -76,7 +77,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
           </button>
         </div>
         
-        <nav className="mt-8">
+        <nav className="mt-8 flex-1 overflow-y-auto pb-40">
           {navigation.map((item) => {
             const isActive = currentHash === item.href;
             return (
@@ -100,9 +101,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
         {/* User Profile Section */}
         <div className="absolute bottom-0 w-full p-6 border-t border-gray-200 bg-gray-50">
           <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
+            {user.avatar ? (
+              <img 
+                src={user.avatar} 
+                alt={displayName}
+                className="w-12 h-12 rounded-full object-cover border-2 border-purple-200"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="ml-3 flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
               <p className="text-xs text-gray-500 capitalize">{user.role}</p>
@@ -151,9 +160,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, user
                   <p className="text-sm font-medium text-gray-900">{displayName}</p>
                   <p className="text-xs text-gray-500 capitalize">{user.role} Account</p>
                 </div>
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
+                {user.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    alt={displayName}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-purple-200"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {displayName.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
             </div>
           </div>
