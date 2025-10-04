@@ -190,16 +190,69 @@ class ApiService {
     });
   }
 
-  // Content methods - FIXED with pagination handling
+  // Content methods - UPDATED with FormData handling and new methods
   async getContent() {
     const response = await this.request('/content/');
     return this.handlePaginatedResponse(response);
   }
 
   async createContent(contentData: any) {
+    // If contentData is FormData, send it directly
+    if (contentData instanceof FormData) {
+      const url = `${this.baseURL}/content/`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(this.token && { Authorization: `Token ${this.token}` }),
+          // Don't set Content-Type for FormData - browser will set it with boundary
+        },
+        body: contentData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    }
+
+    // Otherwise use the regular request method
     return await this.request('/content/', {
       method: 'POST',
       body: JSON.stringify(contentData),
+    });
+  }
+
+  async updateContent(id: string, contentData: any) {
+    // Support both FormData and regular JSON updates
+    if (contentData instanceof FormData) {
+      const url = `${this.baseURL}/content/${id}/`;
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          ...(this.token && { Authorization: `Token ${this.token}` }),
+        },
+        body: contentData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    }
+
+    return await this.request(`/content/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(contentData),
+    });
+  }
+
+  async deleteContent(id: string) {
+    return await this.request(`/content/${id}/`, {
+      method: 'DELETE',
     });
   }
 
@@ -215,6 +268,19 @@ class ApiService {
     });
   }
 
+  async markContentPosted(id: string, data: { 
+    post_url: string; 
+    likes?: number; 
+    comments?: number; 
+    shares?: number; 
+    views?: number; 
+  }) {
+    return await this.request(`/content/${id}/mark_posted/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async bulkApproveContent(data: {
     content_ids: string[];
     action: 'approve' | 'reject';
@@ -224,6 +290,24 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async getContentByPlatform(platform: 'instagram' | 'youtube' | 'tiktok') {
+    return await this.request(`/content/by_platform/?platform=${platform}`);
+  }
+
+  async getContentCalendarView(startDate?: string, endDate?: string) {
+    let url = '/content/calendar_view/';
+    const params = new URLSearchParams();
+    
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+    
+    return await this.request(url);
   }
 
   // Performance data methods - FIXED with pagination handling

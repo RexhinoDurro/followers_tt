@@ -15,7 +15,8 @@ import {
   Plus,
   Link,
   Settings,
-  Download} from 'lucide-react';
+  Download,
+  ExternalLink} from 'lucide-react';
 import { Card, Badge, Button, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/ApiService';
@@ -61,6 +62,13 @@ interface ContentPost {
   status: 'draft' | 'pending-approval' | 'approved' | 'posted';
   engagement_rate?: number;
   created_at: string;
+  title?: string;
+  social_account_username?: string;
+  images?: Array<{ image_url: string }>;
+  likes?: number;
+  comments?: number;
+  views?: number;
+  post_url?: string;
 }
 
 interface Invoice {
@@ -568,9 +576,9 @@ const ClientOverview: React.FC = () => {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Content */}
+        {/* Recent Content Section - UPDATED */}
         <Card title="Recent Content" action={
-          <Button size="sm" variant="outline" onClick={() => setShowCreateContent(true)}>
+          <Button size="sm" variant="outline" onClick={() => window.location.hash = '#content'}>
             <Plus className="w-4 h-4 mr-1" />
             New Post
           </Button>
@@ -578,10 +586,24 @@ const ClientOverview: React.FC = () => {
           <div className="space-y-4">
             {content.slice(0, 5).map((post) => (
               <div key={post.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="text-2xl">{getPlatformIcon(post.platform)}</div>
+                {/* Thumbnail if image exists */}
+                {post.images && post.images.length > 0 && (
+                  <div className="w-16 h-16 flex-shrink-0">
+                    <img
+                      src={post.images[0].image_url}
+                      alt={post.title}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                )}
+                
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-lg">{getPlatformIcon(post.platform)}</span>
                     <span className="font-medium text-gray-900 capitalize">{post.platform}</span>
+                    {post.social_account_username && (
+                      <span className="text-sm text-gray-600">@{post.social_account_username}</span>
+                    )}
                     <Badge variant={
                       post.status === 'posted' ? 'success' :
                       post.status === 'approved' ? 'primary' :
@@ -590,29 +612,73 @@ const ClientOverview: React.FC = () => {
                       {post.status.replace('-', ' ')}
                     </Badge>
                   </div>
+                  
+                  {/* Title */}
+                  {post.title && (
+                    <h4 className="font-medium text-gray-900 mb-1">{post.title}</h4>
+                  )}
+                  
+                  {/* Content preview */}
                   <p className="text-sm text-gray-700 mb-2 line-clamp-2">
                     {post.content.length > 100 ? `${post.content.substring(0, 100)}...` : post.content}
                   </p>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    <span>
-                      <Calendar className="w-3 h-3 inline mr-1" />
-                      {new Date(post.scheduled_date).toLocaleDateString()}
-                    </span>
-                    {post.engagement_rate && (
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4 text-xs text-gray-500">
                       <span>
-                        <Heart className="w-3 h-3 inline mr-1" />
-                        {safeToFixed(post.engagement_rate)}% engagement
+                        <Calendar className="w-3 h-3 inline mr-1" />
+                        {new Date(post.scheduled_date).toLocaleDateString()}
                       </span>
+                      
+                      {/* Show engagement for posted content */}
+                      {post.status === 'posted' && (
+                        <>
+                          {post.likes && post.likes > 0 && (
+                            <span className="flex items-center text-pink-600">
+                              <Heart className="w-3 h-3 mr-1" />
+                              {post.likes}
+                            </span>
+                          )}
+                          {post.comments && post.comments > 0 && (
+                            <span className="flex items-center text-blue-600">
+                              <MessageCircle className="w-3 h-3 mr-1" />
+                              {post.comments}
+                            </span>
+                          )}
+                          {post.views && post.views > 0 && (
+                            <span className="flex items-center text-purple-600">
+                              <Eye className="w-3 h-3 mr-1" />
+                              {post.views}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* View post link for posted content */}
+                    {post.status === 'posted' && post.post_url && (
+                      <a
+                        href={post.post_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center"
+                      >
+                        View Post
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
                     )}
                   </div>
                 </div>
               </div>
             ))}
+            
             {content.length === 0 && (
               <div className="text-center py-6">
                 <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                 <p className="text-gray-500 mb-2">No content yet</p>
-                <Button size="sm" onClick={() => setShowCreateContent(true)}>Create Your First Post</Button>
+                <Button size="sm" onClick={() => window.location.hash = '#content'}>
+                  Create Your First Post
+                </Button>
               </div>
             )}
           </div>

@@ -1,83 +1,166 @@
-// client/src/dashboard/client/ClientContent.tsx
 import React, { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import { 
-  FileText, Plus, Calendar, Clock, Eye, Heart, MessageCircle,
-  Share2, Edit, CheckCircle
+  Plus, Calendar, Clock, Eye, Heart, MessageCircle, Share2, Edit, CheckCircle, 
+  ExternalLink, Image, Send, ArrowLeft
 } from 'lucide-react';
-import { Card, Button, Modal, Input, Badge } from '../../components/ui';
+import { Card, Button, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
+import type { ContentPost } from '../../types';
 
-interface ContentPost {
+// Enhanced ContentPost interface for this component
+interface EnhancedContentPost extends ContentPost {
+  title?: string;
+  images?: Array<{ image_url: string }>;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  views?: number;
+  post_url?: string;
+}
+
+interface ConnectedAccount {
   id: string;
   platform: string;
+  username: string;
+  is_active: boolean;
+  followers_count?: number;
+  engagement_rate?: number;
+  posts_count?: number;
+  last_sync?: string;
+  created_at?: string;
+}
+
+interface ContentFormData {
+  platform: string;
+  social_account: string;
+  title: string;
   content: string;
   scheduled_date: string;
-  status: 'draft' | 'pending-approval' | 'approved' | 'posted';
-  image_url?: string;
-  engagement_rate?: number;
-  created_at: string;
+  admin_message: string;
+  images: File[];
 }
 
 const ClientContent: React.FC = () => {
-  const [content, setContent] = useState<ContentPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filterPlatform, setFilterPlatform] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
-  const [showCreateContent, setShowCreateContent] = useState(false);
-  const [newContent, setNewContent] = useState({
-    platform: 'instagram',
+  const [content, setContent] = useState<EnhancedContentPost[]>([]);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<'grid' | 'create' | 'calendar'>('grid');
+  const [filterPlatform, setFilterPlatform] = useState<string>('all');
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [imagePreview, setImagePreview] = useState<string[]>([]);
+  
+  const [formData, setFormData] = useState<ContentFormData>({
+    platform: '',
+    social_account: '',
+    title: '',
     content: '',
     scheduled_date: '',
-    image_url: ''
+    admin_message: '',
+    images: []
   });
 
   useEffect(() => {
-    fetchContent();
+    fetchData();
   }, []);
 
-  const fetchContent = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await ApiService.getContent();
-      setContent(Array.isArray(data) ? data : []);
+      const [contentData, accountsData] = await Promise.all([
+        ApiService.getContent(),
+        ApiService.getConnectedAccounts()
+      ]);
+      
+      // Handle contentData with proper typing
+      const contentArray = Array.isArray(contentData) 
+        ? contentData as EnhancedContentPost[]
+        : (contentData as any)?.results || [] as EnhancedContentPost[];
+      setContent(contentArray);
+      
+      // Handle accountsData with proper typing
+      const accountsArray = Array.isArray(accountsData) 
+        ? accountsData as ConnectedAccount[]
+        : (accountsData as any)?.accounts || [] as ConnectedAccount[];
+      setConnectedAccounts(accountsArray.filter((acc: ConnectedAccount) => acc.is_active));
     } catch (error) {
-      console.error('Failed to fetch content:', error);
+      console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateContent = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    setFormData(prev => ({ ...prev, images: files }));
+    
+    const previews = files.map((file: File) => URL.createObjectURL(file));
+    setImagePreview(previews);
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = formData.images.filter((_: File, i: number) => i !== index);
+    const newPreviews = imagePreview.filter((_: string, i: number) => i !== index);
+    setFormData(prev => ({ ...prev, images: newImages }));
+    setImagePreview(newPreviews);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+
     try {
-      await ApiService.createContent(newContent);
-      await fetchContent();
-      setShowCreateContent(false);
-      setNewContent({
-        platform: 'instagram',
+      const submitData = new FormData();
+      submitData.append('platform', formData.platform);
+      submitData.append('title', formData.title);
+      submitData.append('content', formData.content);
+      submitData.append('scheduled_date', formData.scheduled_date);
+      submitData.append('admin_message', formData.admin_message);
+      
+      if (formData.social_account) {
+        submitData.append('social_account', formData.social_account);
+      }
+      
+      formData.images.forEach((img: File) => {
+        submitData.append('images', img);
+      });
+
+      await ApiService.createContent(submitData);
+      
+      // Reset form
+      setFormData({
+        platform: '',
+        social_account: '',
+        title: '',
         content: '',
         scheduled_date: '',
-        image_url: ''
-      });
+        admin_message: '',
+        images: []
+      } as ContentFormData);
+      setImagePreview([]);
+      
+      // Refresh data and switch to grid view
+      await fetchData();
+      setViewMode('grid');
+      alert('Content submitted for approval!');
+      
     } catch (error) {
       console.error('Failed to create content:', error);
+      alert('Failed to submit content. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const getPlatformIcon = (platform: string) => {
-    switch (platform.toLowerCase()) {
-      case 'instagram': return '📸';
-      case 'tiktok': return '🎵';
-      case 'youtube': return '🎥';
-      case 'facebook': return '📘';
-      case 'twitter': return '🐦';
-      case 'linkedin': return '💼';
-      default: return '📱';
-    }
+  const getPlatformIcon = (platform: string): string => {
+    const icons: Record<string, string> = {
+      instagram: '📸',
+      youtube: '🎥',
+      tiktok: '🎵'
+    };
+    return icons[platform] || '📱';
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): 'default' | 'warning' | 'primary' | 'success' => {
     switch (status) {
       case 'draft': return 'default';
       case 'pending-approval': return 'warning';
@@ -88,9 +171,8 @@ const ClientContent: React.FC = () => {
   };
 
   const filteredContent = content.filter(post => {
-    const matchesPlatform = filterPlatform === 'all' || post.platform === filterPlatform;
-    const matchesStatus = filterStatus === 'all' || post.status === filterStatus;
-    return matchesPlatform && matchesStatus;
+    if (filterPlatform === 'all') return true;
+    return post.platform === filterPlatform;
   });
 
   const stats = {
@@ -101,6 +183,12 @@ const ClientContent: React.FC = () => {
     posted: content.filter(c => c.status === 'posted').length
   };
 
+  const platformStats = ['instagram', 'youtube', 'tiktok'].map(platform => ({
+    platform,
+    count: content.filter(c => c.platform === platform).length,
+    account: connectedAccounts.find(acc => acc.platform === platform && acc.is_active)
+  }));
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -109,6 +197,186 @@ const ClientContent: React.FC = () => {
     );
   }
 
+  // CREATE CONTENT VIEW
+  if (viewMode === 'create') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setViewMode('grid')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Create New Content</h1>
+              <p className="text-gray-600 mt-1">Schedule your social media post</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Platform Selection */}
+        <Card title="Select Platform">
+          <div className="grid grid-cols-3 gap-4">
+            {['instagram', 'youtube', 'tiktok'].map((platform) => {
+              const account = connectedAccounts.find(acc => acc.platform === platform && acc.is_active);
+              const isDisabled = !account;
+              
+              return (
+                <button
+                  key={platform}
+                  type="button"
+                  onClick={() => {
+                    if (!isDisabled) {
+                      setFormData(prev => ({ ...prev, platform, social_account: account.id }));
+                    }
+                  }}
+                  disabled={isDisabled}
+                  className={`p-6 border-2 rounded-xl transition-all ${
+                    formData.platform === platform
+                      ? 'border-purple-600 bg-purple-50'
+                      : isDisabled
+                      ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                      : 'border-gray-200 hover:border-purple-300'
+                  }`}
+                >
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-3xl">{getPlatformIcon(platform)}</span>
+                    <span className="font-medium capitalize">{platform}</span>
+                    {account && (
+                      <span className="text-xs text-gray-600">@{account.username}</span>
+                    )}
+                    {!account && (
+                      <Badge variant="warning">Not Connected</Badge>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Post Details */}
+        <Card title="Post Details">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Post Title *
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter a catchy title for your post"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Post Description / Caption *
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                rows={6}
+                placeholder="Write your post content here..."
+                required
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                {formData.content.length} characters
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Schedule Date & Time *
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.scheduled_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, scheduled_date: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                required
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Images Upload */}
+        <Card title="Upload Images">
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+                id="image-upload"
+              />
+              <label htmlFor="image-upload" className="cursor-pointer block">
+                <Image className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">Click to upload images</p>
+                <p className="text-sm text-gray-500 mt-1">PNG, JPG, GIF up to 10MB each</p>
+              </label>
+            </div>
+
+            {imagePreview.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {imagePreview.map((preview, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Message to Admin */}
+        <Card title="Message to Admin (Optional)">
+          <textarea
+            value={formData.admin_message}
+            onChange={(e) => setFormData(prev => ({ ...prev, admin_message: e.target.value }))}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            rows={4}
+            placeholder="Add any special instructions or notes for your admin..."
+          />
+        </Card>
+
+        {/* Submit Buttons */}
+        <div className="flex justify-end space-x-4">
+          <Button
+            variant="outline"
+            onClick={() => setViewMode('grid')}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={submitting || !formData.platform}>
+            <Send className="w-4 h-4 mr-2" />
+            {submitting ? 'Submitting...' : 'Submit for Approval'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // GRID VIEW (DEFAULT)
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -117,21 +385,54 @@ const ClientContent: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Content Calendar</h1>
           <p className="text-gray-600 mt-1">Plan and manage your social media content</p>
         </div>
-        <Button onClick={() => setShowCreateContent(true)}>
+        <Button onClick={() => setViewMode('create')}>
           <Plus className="w-4 h-4 mr-2" />
           Create Content
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Platform Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {platformStats.map(({ platform, count, account }) => (
+          <div
+            key={platform}
+            className={`cursor-pointer transition-all ${
+              filterPlatform === platform ? 'ring-2 ring-purple-600 bg-purple-50' : ''
+            }`}
+            onClick={() => setFilterPlatform(filterPlatform === platform ? 'all' : platform)}
+          >
+            <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-3xl">{getPlatformIcon(platform)}</span>
+                <div>
+                  <p className="font-medium text-gray-900 capitalize">{platform}</p>
+                  {account && (
+                    <p className="text-sm text-gray-600">@{account.username}</p>
+                  )}
+                  {!account && (
+                    <Badge variant="warning">Not Connected</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-gray-900">{count}</p>
+                <p className="text-sm text-gray-600">posts</p>
+              </div>
+            </div>
+            </Card>
+          </div>
+        ))}
+      </div>
+
+      {/* Status Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-600 text-sm">Total Posts</p>
+              <p className="text-blue-600 text-sm">Total</p>
               <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
             </div>
-            <FileText className="w-8 h-8 text-blue-400" />
           </div>
         </Card>
         
@@ -141,7 +442,6 @@ const ClientContent: React.FC = () => {
               <p className="text-gray-600 text-sm">Drafts</p>
               <p className="text-2xl font-bold text-gray-900">{stats.draft}</p>
             </div>
-            <Edit className="w-8 h-8 text-gray-400" />
           </div>
         </Card>
         
@@ -176,276 +476,143 @@ const ClientContent: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filters and View Mode */}
-      <Card>
-        <div className="flex flex-col md:flex-row gap-4 justify-between">
-          <div className="flex gap-3">
-            <select
-              value={filterPlatform}
-              onChange={(e) => setFilterPlatform(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="all">All Platforms</option>
-              <option value="instagram">Instagram</option>
-              <option value="tiktok">TikTok</option>
-              <option value="youtube">YouTube</option>
-              <option value="facebook">Facebook</option>
-              <option value="twitter">Twitter</option>
-              <option value="linkedin">LinkedIn</option>
-            </select>
-            
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="all">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="pending-approval">Pending Approval</option>
-              <option value="approved">Approved</option>
-              <option value="posted">Posted</option>
-            </select>
-          </div>
-          
-          <div className="flex gap-2">
+      {/* View Toggle */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setFilterPlatform('all')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filterPlatform === 'all'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All Content
+          </button>
+          {['instagram', 'youtube', 'tiktok'].map(platform => (
             <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
+              key={platform}
+              onClick={() => setFilterPlatform(filterPlatform === platform ? 'all' : platform)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+                filterPlatform === platform
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
+              <span>{getPlatformIcon(platform)}</span>
+              <span className="capitalize">{platform}</span>
             </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewMode('calendar')}
-              className={`p-2 rounded-lg ${viewMode === 'calendar' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              <Calendar className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Content Grid */}
-      {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredContent.map((post) => (
-            <Card key={post.id} className="hover:shadow-xl transition-all duration-300 overflow-hidden">
-              {post.image_url && (
-                <div className="h-48 bg-gray-100 -mx-6 -mt-6 mb-4 overflow-hidden">
-                  <img 
-                    src={post.image_url} 
-                    alt="Content preview" 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <span className="text-2xl">{getPlatformIcon(post.platform)}</span>
-                  <span className="font-medium text-gray-900 capitalize">{post.platform}</span>
-                </div>
-                <Badge variant={getStatusColor(post.status)}>
-                  {post.status.replace('-', ' ')}
-                </Badge>
-              </div>
-              
-              <p className="text-gray-700 mb-4 line-clamp-3">
-                {post.content}
-              </p>
-              
-              <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  {new Date(post.scheduled_date).toLocaleDateString()}
-                </div>
-                <div className="flex items-center">
-                  <Clock className="w-4 h-4 mr-1" />
-                  {new Date(post.scheduled_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-              
-              {post.status === 'posted' && post.engagement_rate && (
-                <div className="pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3 text-sm">
-                      <span className="flex items-center text-pink-600">
-                        <Heart className="w-4 h-4 mr-1" />
-                        {(post.engagement_rate * 100).toFixed(1)}%
-                      </span>
-                      <span className="flex items-center text-blue-600">
-                        <Eye className="w-4 h-4 mr-1" />
-                        12.5K
-                      </span>
-                      <span className="flex items-center text-green-600">
-                        <MessageCircle className="w-4 h-4 mr-1" />
-                        234
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {post.status === 'draft' && (
-                <div className="flex gap-2 mt-4">
-                  <Button size="sm" className="flex-1">
-                    <Edit className="w-4 h-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1">
-                    Submit
-                  </Button>
-                </div>
-              )}
-            </Card>
           ))}
         </div>
-      )}
+        <button
+          onClick={() => setViewMode(viewMode === 'calendar' ? 'grid' : 'calendar')}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+            viewMode === 'calendar'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Calendar View</span>
+        </button>
+      </div>
 
-      {/* List View */}
-      {viewMode === 'list' && (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left pb-3 font-medium text-gray-900">Platform</th>
-                  <th className="text-left pb-3 font-medium text-gray-900">Content</th>
-                  <th className="text-left pb-3 font-medium text-gray-900">Scheduled</th>
-                  <th className="text-left pb-3 font-medium text-gray-900">Status</th>
-                  <th className="text-left pb-3 font-medium text-gray-900">Engagement</th>
-                  <th className="text-left pb-3 font-medium text-gray-900">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredContent.map((post) => (
-                  <tr key={post.id} className="hover:bg-gray-50">
-                    <td className="py-4">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xl">{getPlatformIcon(post.platform)}</span>
-                        <span className="capitalize">{post.platform}</span>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <p className="text-gray-700 truncate max-w-xs">{post.content}</p>
-                    </td>
-                    <td className="py-4 text-gray-600">
-                      {new Date(post.scheduled_date).toLocaleDateString()}
-                    </td>
-                    <td className="py-4">
-                      <Badge variant={getStatusColor(post.status)}>
-                        {post.status.replace('-', ' ')}
-                      </Badge>
-                    </td>
-                    <td className="py-4">
-                      {post.engagement_rate ? `${(post.engagement_rate * 100).toFixed(1)}%` : '-'}
-                    </td>
-                    <td className="py-4">
-                      <div className="flex gap-2">
-                        <button className="text-blue-600 hover:text-blue-800">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="text-gray-600 hover:text-gray-800">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      {/* Calendar View */}
-      {viewMode === 'calendar' && (
-        <Card>
-          <div className="text-center py-12">
-            <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Calendar View Coming Soon</h3>
-            <p className="text-gray-600">A visual calendar to manage your content schedule</p>
-          </div>
-        </Card>
-      )}
-
-      {/* Create Content Modal */}
-      <Modal
-        isOpen={showCreateContent}
-        onClose={() => setShowCreateContent(false)}
-        title="Create New Content"
-        size="lg"
-      >
-        <form onSubmit={handleCreateContent} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-            <select
-              value={newContent.platform}
-              onChange={(e) => setNewContent({ ...newContent, platform: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-              required
-            >
-              <option value="instagram">Instagram</option>
-              <option value="tiktok">TikTok</option>
-              <option value="youtube">YouTube</option>
-              <option value="facebook">Facebook</option>
-              <option value="twitter">Twitter</option>
-              <option value="linkedin">LinkedIn</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
-            <textarea
-              value={newContent.content}
-              onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-              rows={6}
-              placeholder="Write your post content here..."
-              required
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              {newContent.content.length} characters
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Schedule Date"
-              type="datetime-local"
-              value={newContent.scheduled_date}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContent({ ...newContent, scheduled_date: e.target.value })}
-              required
-            />
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredContent.map((post) => (
+          <Card key={post.id} className="hover:shadow-xl transition-all duration-300">
+            {post.images && post.images.length > 0 && (
+              <div className="h-48 bg-gray-100 -mx-6 -mt-6 mb-4 overflow-hidden">
+                <img 
+                  src={post.images[0].image_url} 
+                  alt={post.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
             
-            <Input
-              label="Image URL (optional)"
-              type="url"
-              value={newContent.image_url}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewContent({ ...newContent, image_url: e.target.value })}
-              placeholder="https://example.com/image.jpg"
-            />
-          </div>
-          
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setShowCreateContent(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              Submit for Approval
-            </Button>
-          </div>
-        </form>
-      </Modal>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">{getPlatformIcon(post.platform)}</span>
+                <span className="font-medium text-gray-900 capitalize">{post.platform}</span>
+              </div>
+              <Badge variant={getStatusColor(post.status)}>
+                {post.status.replace('-', ' ')}
+              </Badge>
+            </div>
+            
+            <h3 className="font-semibold text-gray-900 mb-2">{post.title}</h3>
+            <p className="text-gray-700 text-sm mb-4 line-clamp-3">{post.content}</p>
+            
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+              <div className="flex items-center">
+                <Calendar className="w-3 h-3 mr-1" />
+                {new Date(post.scheduled_date).toLocaleDateString()}
+              </div>
+              <div className="flex items-center">
+                <Clock className="w-3 h-3 mr-1" />
+                {new Date(post.scheduled_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+            
+            {post.status === 'posted' && (
+              <>
+                {post.post_url && (
+                  <a
+                    href={post.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors mb-3"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Posted Content
+                  </a>
+                )}
+                
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center text-pink-600">
+                      <Heart className="w-4 h-4 mr-1" />
+                      {post.likes || 0}
+                    </span>
+                    <span className="flex items-center text-blue-600">
+                      <MessageCircle className="w-4 h-4 mr-1" />
+                      {post.comments || 0}
+                    </span>
+                    <span className="flex items-center text-green-600">
+                      <Share2 className="w-4 h-4 mr-1" />
+                      {post.shares || 0}
+                    </span>
+                    <span className="flex items-center text-purple-600">
+                      <Eye className="w-4 h-4 mr-1" />
+                      {post.views || 0}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {post.status === 'draft' && (
+              <Button size="sm" variant="outline" className="w-full">
+                <Edit className="w-4 h-4 mr-1" />
+                Edit Draft
+              </Button>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      {filteredContent.length === 0 && (
+        <Card className="text-center py-12">
+          <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Content Yet</h3>
+          <p className="text-gray-600 mb-4">Create your first post to get started</p>
+          <Button onClick={() => setViewMode('create')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Content
+          </Button>
+        </Card>
+      )}
     </div>
   );
 };
