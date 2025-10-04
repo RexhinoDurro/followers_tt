@@ -225,9 +225,17 @@ LINKEDIN_CLIENT_SECRET = config('LINKEDIN_CLIENT_SECRET', default='')
 # Encryption key for storing access tokens (32 characters)
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='your-32-character-encryption-key-here')
 
-# ============ CELERY CONFIGURATION ============
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+# ============ REDIS & CACHE CONFIGURATION ============
+
+# Redis connection URL
+REDIS_URL = config('REDIS_URL', default='redis://127.0.0.1:6379')
+
+# ============ CELERY CONFIGURATION (Uses Redis) ============
+
+# Celery broker and result backend
+CELERY_BROKER_URL = f'{REDIS_URL}/0'  # Database 0 for Celery
+CELERY_RESULT_BACKEND = f'{REDIS_URL}/0'
+# Celery settings
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -248,32 +256,54 @@ CELERY_BEAT_SCHEDULE = {
     # Clean up old metrics weekly
     'cleanup-old-metrics': {
         'task': 'api.tasks.cleanup_old_metrics',
-        'schedule': crontab(minute=0, hour=2, day_of_week=0),  # Sunday at 2 AM
+        'schedule': crontab(minute=0, hour=2, day_of_week=0),
     },
     # Generate weekly reports
     'generate-weekly-reports': {
         'task': 'api.tasks.generate_weekly_reports',
-        'schedule': crontab(minute=0, hour=9, day_of_week=1),  # Monday at 9 AM
-    },
-    # Update monthly performance data daily
-    'update-monthly-performance': {
-        'task': 'api.tasks.update_all_monthly_performance',
-        'schedule': crontab(minute=30, hour=1),  # Daily at 1:30 AM
+        'schedule': crontab(minute=0, hour=9, day_of_week=1),
     },
 }
 
-# Cache configuration
+# ============ CACHE TIMEOUTS ============
+
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 600  # 10 minutes
+CACHE_MIDDLEWARE_KEY_PREFIX = 'visionboost_middleware'
+
+# Custom cache timeouts for different data types
+CACHE_TIMEOUTS = {
+    'verification_code': 600,      # 10 minutes
+    'user_session': 3600,          # 1 hour
+    'api_response': 300,           # 5 minutes
+    'dashboard_stats': 180,        # 3 minutes
+    'social_metrics': 900,         # 15 minutes
+}
+
+# Cache configuration using Redis
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config('REDIS_URL', default='redis://127.0.0.1:6379/1'),
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': f'{REDIS_URL}/1',  # Use database 1 for cache
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 50,
+                'retry_on_timeout': True,
+            },
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'IGNORE_EXCEPTIONS': True,  # Don't crash if Redis is down
         },
-        'KEY_PREFIX': 'smma_cache',
+        'KEY_PREFIX': 'visionboost',
         'TIMEOUT': 300,  # 5 minutes default timeout
     }
 }
+
+# Session cache (optional but recommended)
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
 
 # Use local memory cache for development
 if DEBUG:
