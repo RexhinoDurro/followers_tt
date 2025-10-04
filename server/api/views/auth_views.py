@@ -88,22 +88,42 @@ def current_user_view(request):
         return Response(UserSerializer(request.user).data)
     
     elif request.method == 'PATCH':
-        user = request.user
-        
-        # Handle avatar upload separately
-        if 'avatar' in request.FILES:
-            # Delete old avatar if exists
-            if user.avatar:
-                user.avatar.delete(save=False)
-            user.avatar = request.FILES['avatar']
-            user.save()
-        
-        # Update other fields
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = request.user
+            
+            # Create a mutable copy of the request data
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            
+            # Handle avatar upload separately
+            if 'avatar' in request.FILES:
+                # Delete old avatar if exists
+                if user.avatar:
+                    try:
+                        user.avatar.delete(save=False)
+                    except:
+                        pass
+                user.avatar = request.FILES['avatar']
+                user.save()
+                # Remove avatar from data dict to avoid serializer issues
+                if 'avatar' in data:
+                    del data['avatar']
+            
+            # Update other fields
+            serializer = UserSerializer(user, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            
+            # Log validation errors for debugging
+            logger.error(f"Profile update validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Profile update error: {str(e)}")
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
@@ -113,24 +133,35 @@ def update_profile(request):
     try:
         user = request.user
         
+        # Create a mutable copy of the request data
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        
         # Handle avatar upload separately
         if 'avatar' in request.FILES:
             # Delete old avatar if exists
             if user.avatar:
-                user.avatar.delete(save=False)
+                try:
+                    user.avatar.delete(save=False)
+                except:
+                    pass
             user.avatar = request.FILES['avatar']
             user.save()
+            # Remove avatar from data dict to avoid serializer issues
+            if 'avatar' in data:
+                del data['avatar']
         
         # Update other fields
-        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer = UserSerializer(user, data=data, partial=True)
         
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         
+        logger.error(f"Profile update validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     except Exception as e:
+        logger.error(f"Profile update error: {str(e)}")
         return Response({'error': str(e)}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -168,5 +199,6 @@ def change_password(request):
         return Response({'message': 'Password changed successfully'})
         
     except Exception as e:
+        logger.error(f"Password change error: {str(e)}")
         return Response({'error': str(e)}, 
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
