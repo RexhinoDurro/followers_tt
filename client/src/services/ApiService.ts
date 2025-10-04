@@ -487,6 +487,54 @@ class ApiService {
     });
   }
 
+      // ============ EMAIL VERIFICATION METHODS ============
+
+    async sendVerificationCode(data: {
+      email: string;
+      name: string;
+      purpose?: 'registration' | 'password_reset';
+    }) {
+      return await this.request('/auth/send-verification-code/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    }
+
+    async verifyAndRegister(data: {
+      email: string;
+      password: string;
+      name: string;
+      role: string;
+      company?: string;
+      verification_code: string;
+    }) {
+      const response = await this.request<{
+        user: any;
+        token: string;
+      }>('/auth/verify-and-register/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (response.token) {
+        this.token = response.token;
+        localStorage.setItem('auth_token', response.token);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      }
+
+      return response;
+    }
+
+    async resendVerificationCode(data: {
+      email: string;
+      name: string;
+      purpose?: 'registration' | 'password_reset';
+    }) {
+      return await this.request('/auth/resend-verification-code/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    }
   // ============ ADMIN METHODS ============
   
   // Get admin billing settings

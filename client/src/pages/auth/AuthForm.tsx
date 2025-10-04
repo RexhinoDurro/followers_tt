@@ -1,7 +1,8 @@
-// client/src/pages/auth/AuthForm.tsx - Clean Multi-Step Design
+// client/src/pages/auth/AuthForm.tsx - Updated with Email Verification
 import React, { useState } from 'react';
 import { Eye, EyeOff, AlertCircle, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import ApiService from '../../services/ApiService';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -10,7 +11,7 @@ interface AuthFormProps {
 }
 
 export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess }) => {
-  const { login, register, loading, error } = useAuth();
+  const { login, loading: authLoading, error: authError } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     email: '',
@@ -21,6 +22,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Cooldown timer for resend button
+  React.useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +71,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
     setCurrentStep(2);
   };
 
-  const handleSignupStep2 = (e: React.FormEvent) => {
+  const handleSignupStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
@@ -74,7 +85,22 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
       return;
     }
 
-    setCurrentStep(3);
+    // Send verification code
+    setLoading(true);
+    try {
+      await ApiService.sendVerificationCode({
+        email: formData.email,
+        name: formData.name,
+        purpose: 'registration'
+      });
+      
+      setCurrentStep(3);
+      setFormError('');
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to send verification code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignupStep3 = async (e: React.FormEvent) => {
@@ -86,39 +112,68 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
       return;
     }
 
+    setLoading(true);
     try {
-      // TODO: Verify the code first, then create account
-      const success = await register({
+      const response = await ApiService.verifyAndRegister({
         email: formData.email,
         password: formData.password,
         name: formData.name,
         role: 'client',
         company: formData.company || undefined,
+        verification_code: formData.verificationCode
       });
 
-      if (success) {
+      if (response.token) {
         onSuccess();
       }
-    } catch (err) {
-      console.error('Signup error:', err);
+    } catch (err: any) {
+      setFormError(err.message || 'Invalid or expired verification code');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const displayError = formError || error;
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
 
-  // Login Form
+    setLoading(true);
+    setFormError('');
+    
+    try {
+      await ApiService.resendVerificationCode({
+        email: formData.email,
+        name: formData.name,
+        purpose: 'registration'
+      });
+      
+      setResendCooldown(60); // 60 second cooldown
+      setFormError('');
+      
+      // Show success message briefly
+      setFormError('Code resent successfully!');
+      setTimeout(() => {
+        setFormError('');
+      }, 3000);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to resend code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayError = formError || authError;
+
+  // Login Form (unchanged)
   if (isLogin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10">
-            {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
               <p className="text-gray-600">Sign in to your account</p>
             </div>
 
-            {/* Error Message */}
             {displayError && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
@@ -126,7 +181,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               </div>
             )}
 
-            {/* Login Form */}
             <form onSubmit={handleLoginSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -138,7 +192,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="Enter your email or username"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                  disabled={loading}
+                  disabled={authLoading}
                 />
               </div>
 
@@ -153,7 +207,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Enter your password"
                     className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    disabled={loading}
+                    disabled={authLoading}
                   />
                   <button
                     type="button"
@@ -177,19 +231,18 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={authLoading}
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {authLoading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
 
-            {/* Toggle to Signup */}
             <div className="mt-6 text-center">
               <button
                 onClick={onToggle}
                 className="text-sm text-gray-600 hover:text-purple-600"
-                disabled={loading}
+                disabled={authLoading}
               >
                 Don't have an account? <span className="font-semibold">Create one</span>
               </button>
@@ -200,13 +253,12 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
     );
   }
 
-  // Signup Form - Step 1: Username & Email
+  // Signup Step 1: Basic Info
   if (currentStep === 1) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10">
-            {/* Progress Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-purple-600">Step 1 of 3</span>
@@ -217,13 +269,11 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               </div>
             </div>
 
-            {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
               <p className="text-gray-600">Let's start with your basic information</p>
             </div>
 
-            {/* Error Message */}
             {displayError && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
@@ -231,7 +281,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSignupStep1} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -282,7 +331,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               </button>
             </form>
 
-            {/* Toggle to Login */}
             <div className="mt-6 text-center">
               <button
                 onClick={onToggle}
@@ -297,13 +345,12 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
     );
   }
 
-  // Signup Form - Step 2: Create Password
+  // Signup Step 2: Password
   if (currentStep === 2) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10">
-            {/* Progress Indicator */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-purple-600">Step 2 of 3</span>
@@ -314,13 +361,11 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               </div>
             </div>
 
-            {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Secure Your Account</h1>
               <p className="text-gray-600">Create a strong password for your account</p>
             </div>
 
-            {/* Error Message */}
             {displayError && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
@@ -328,7 +373,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSignupStep2} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -353,7 +397,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                 </div>
               </div>
 
-              {/* Password Requirements */}
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                 <p className="text-sm font-medium text-gray-700 mb-2">Password must contain:</p>
                 <div className="space-y-1">
@@ -383,16 +426,18 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
                   type="button"
                   onClick={() => setCurrentStep(1)}
                   className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-all flex items-center justify-center"
+                  disabled={loading}
                 >
                   <ArrowLeft className="w-5 h-5 mr-2" />
                   Back
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center"
+                  disabled={loading}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Continue
-                  <ArrowRight className="w-5 h-5 ml-2" />
+                  {loading ? 'Sending Code...' : 'Continue'}
+                  {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
                 </button>
               </div>
             </form>
@@ -402,12 +447,11 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
     );
   }
 
-  // Signup Form - Step 3: Email Verification
+  // Signup Step 3: Email Verification
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10">
-          {/* Progress Indicator */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-purple-600">Step 3 of 3</span>
@@ -418,7 +462,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
             </div>
           </div>
 
-          {/* Header */}
           <div className="mb-8 text-center">
             <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,7 +475,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
             </p>
           </div>
 
-          {/* Error Message */}
           {displayError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
@@ -440,7 +482,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSignupStep3} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
@@ -483,10 +524,15 @@ export const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onToggle, onSuccess
             </div>
           </form>
 
-          {/* Resend Code */}
           <div className="mt-6 text-center">
-            <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-              Didn't receive the code? Resend
+            <button 
+              onClick={handleResendCode}
+              disabled={resendCooldown > 0 || loading}
+              className="text-sm text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resendCooldown > 0 
+                ? `Resend code in ${resendCooldown}s` 
+                : "Didn't receive the code? Resend"}
             </button>
           </div>
         </div>

@@ -24,6 +24,12 @@ from .views import (
     health_check
 )
 
+from .views.auth_views import (
+    RegisterView, LoginView, logout_view, current_user_view,
+    update_profile, change_password,
+    # NEW: Add verification endpoints
+    send_verification_code, verify_and_register, resend_verification_code
+)
 # Import auth views
 try:
     from .views.profile_views import update_profile, change_password
@@ -149,6 +155,10 @@ urlpatterns = [
     path('auth/me/', current_user_view, name='current_user'),
     path('auth/change-password/', change_password, name='change_password'),
     
+    # NEW: Email verification endpoints
+    path('auth/send-verification-code/', send_verification_code, name='send_verification_code'),
+    path('auth/verify-and-register/', verify_and_register, name='verify_and_register'),
+    path('auth/resend-verification-code/', resend_verification_code, name='resend_verification_code'),
     # OAuth endpoints
     path('oauth/instagram/initiate/', initiate_instagram_oauth, name='instagram_oauth_initiate'),
     path('oauth/instagram/callback/', handle_instagram_callback, name='instagram_oauth_callback'),
@@ -180,6 +190,7 @@ urlpatterns = [
     # One-time payments
     path('billing/create-order/', create_order, name='create_order'),
     path('billing/capture-payment/', capture_payment, name='capture_payment'),
+    
     
     # Invoice payments (stub for compatibility)
     path('billing/invoices/<uuid:invoice_id>/pay/', pay_invoice_stub, name='pay_invoice'),
