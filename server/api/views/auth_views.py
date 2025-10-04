@@ -85,14 +85,12 @@ def logout_view(request):
 def current_user_view(request):
     """Get or update current user profile"""
     if request.method == 'GET':
-        return Response(UserSerializer(request.user).data)
+        serializer = UserSerializer(request.user, context={'request': request})
+        return Response(serializer.data)
     
     elif request.method == 'PATCH':
         try:
             user = request.user
-            
-            # Create a mutable copy of the request data
-            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
             
             # Handle avatar upload separately
             if 'avatar' in request.FILES:
@@ -104,26 +102,24 @@ def current_user_view(request):
                         pass
                 user.avatar = request.FILES['avatar']
                 user.save()
-                # Remove avatar from data dict to avoid serializer issues
-                if 'avatar' in data:
-                    del data['avatar']
             
-            # Update other fields
-            serializer = UserSerializer(user, data=data, partial=True)
+            # Update other fields (excluding avatar)
+            data = {k: v for k, v in request.data.items() if k != 'avatar'}
+            serializer = UserSerializer(user, data=data, partial=True, context={'request': request})
+            
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data)
+                # Return fresh data with updated avatar URL
+                return Response(UserSerializer(user, context={'request': request}).data)
             
-            # Log validation errors for debugging
             logger.error(f"Profile update validation errors: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
         except Exception as e:
             logger.error(f"Profile update error: {str(e)}")
-            return Response(
-                {'error': str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
