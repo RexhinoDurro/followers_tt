@@ -62,106 +62,105 @@ class ContentPostViewSet(ModelViewSet):
         return queryset.select_related('client', 'social_account', 'approved_by').prefetch_related('images').order_by('-scheduled_date')
     
     def create(self, request, *args, **kwargs):
-    """Create content post - FIXED"""
-    try:
-        logger.info(f"Content creation request from {request.user.email}")
-        logger.info(f"Request data: {request.data}")
-        
-        # Get the client
-        if request.user.role == 'client':
-            try:
-                client = request.user.client_profile
-            except Client.DoesNotExist:
-                return Response(
-                    {'error': 'Client profile not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            # Admin can specify client
-            client_id = request.data.get('client')
-            if not client_id:
-                return Response(
-                    {'error': 'Client ID is required'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            try:
-                client = Client.objects.get(id=client_id)
-            except Client.DoesNotExist:
-                return Response(
-                    {'error': 'Client not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        
-        # Prepare data
-        data = request.data.copy()
-        
-        # Handle uploaded images
-        uploaded_images = []
-        image_files = request.FILES.getlist('images')
-        if image_files:
-            uploaded_images = image_files
-            logger.info(f"Received {len(uploaded_images)} images")
-        
-        # FIXED: Handle social account - fetch the actual instance, not just the ID
-        social_account = None
-        social_account_id = data.get('social_account')
-        if social_account_id:
-            try:
-                social_account = SocialMediaAccount.objects.get(id=social_account_id)
-                # Verify it belongs to this client
-                if social_account.client != client:
+        try:
+            logger.info(f"Content creation request from {request.user.email}")
+            logger.info(f"Request data: {request.data}")
+            
+            # Get the client
+            if request.user.role == 'client':
+                try:
+                    client = request.user.client_profile
+                except Client.DoesNotExist:
                     return Response(
-                        {'error': 'Social account does not belong to this client'},
-                        status=status.HTTP_403_FORBIDDEN
+                        {'error': 'Client profile not found'},
+                        status=status.HTTP_404_NOT_FOUND
                     )
-            except SocialMediaAccount.DoesNotExist:
-                return Response(
-                    {'error': 'Social account not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        
-        # Create content post
-        content_data = {
-            'platform': data.get('platform'),
-            'title': data.get('title', ''),
-            'content': data.get('content', ''),
-            'scheduled_date': data.get('scheduled_date'),
-            'admin_message': data.get('admin_message', ''),
-            'social_account': social_account,  # NOW it's an instance, not a string
-        }
-        
-        # Set status based on user role
-        if request.user.role == 'client':
-            content_data['status'] = 'pending-approval'
-        else:
-            content_data['status'] = data.get('status', 'approved')
-        
-        # Create the post
-        content_post = ContentPost.objects.create(
-            client=client,
-            **content_data
-        )
-        
-        # Save images
-        for i, image_file in enumerate(uploaded_images):
-            ContentImage.objects.create(
-                content_post=content_post,
-                image=image_file,
-                order=i
+            else:
+                # Admin can specify client
+                client_id = request.data.get('client')
+                if not client_id:
+                    return Response(
+                        {'error': 'Client ID is required'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                try:
+                    client = Client.objects.get(id=client_id)
+                except Client.DoesNotExist:
+                    return Response(
+                        {'error': 'Client not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # Prepare data
+            data = request.data.copy()
+            
+            # Handle uploaded images
+            uploaded_images = []
+            image_files = request.FILES.getlist('images')
+            if image_files:
+                uploaded_images = image_files
+                logger.info(f"Received {len(uploaded_images)} images")
+            
+            # FIXED: Handle social account - fetch the actual instance, not just the ID
+            social_account = None
+            social_account_id = data.get('social_account')
+            if social_account_id:
+                try:
+                    social_account = SocialMediaAccount.objects.get(id=social_account_id)
+                    # Verify it belongs to this client
+                    if social_account.client != client:
+                        return Response(
+                            {'error': 'Social account does not belong to this client'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                except SocialMediaAccount.DoesNotExist:
+                    return Response(
+                        {'error': 'Social account not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # Create content post
+            content_data = {
+                'platform': data.get('platform'),
+                'title': data.get('title', ''),
+                'content': data.get('content', ''),
+                'scheduled_date': data.get('scheduled_date'),
+                'admin_message': data.get('admin_message', ''),
+                'social_account': social_account,  # NOW it's an instance, not a string
+            }
+            
+            # Set status based on user role
+            if request.user.role == 'client':
+                content_data['status'] = 'pending-approval'
+            else:
+                content_data['status'] = data.get('status', 'approved')
+            
+            # Create the post
+            content_post = ContentPost.objects.create(
+                client=client,
+                **content_data
             )
-        
-        logger.info(f"Content post created: {content_post.id}")
-        
-        # Return serialized data
-        serializer = self.get_serializer(content_post)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
-    except Exception as e:
-        logger.error(f"Content creation error: {str(e)}", exc_info=True)
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+            
+            # Save images
+            for i, image_file in enumerate(uploaded_images):
+                ContentImage.objects.create(
+                    content_post=content_post,
+                    image=image_file,
+                    order=i
+                )
+            
+            logger.info(f"Content post created: {content_post.id}")
+            
+            # Return serialized data
+            serializer = self.get_serializer(content_post)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Content creation error: {str(e)}", exc_info=True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
