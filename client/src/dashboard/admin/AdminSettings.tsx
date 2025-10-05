@@ -1,13 +1,12 @@
-// client/src/dashboard/admin/AdminSettings.tsx - Fixed imports and functionality
+// client/src/dashboard/admin/AdminSettings.tsx - Redesigned to match ClientSettings
 import React, { useState, useEffect } from 'react';
 import {
-  CreditCard, DollarSign, Trash2, AlertTriangle,
-  Shield, User, Bell, Download,
-  Eye, EyeOff, Check, Save, Loader
+  User, Lock, Upload, Camera, Save, AlertCircle, CheckCircle,
+  DollarSign, CreditCard, Shield, Trash2, AlertTriangle,
+  Bell, Eye, EyeOff, Loader
 } from 'lucide-react';
-import { Card, Button, Modal, Input, Badge } from '../../components/ui';
-import ApiService from '../../services/ApiService';
 import { useAuth } from '../../context/AuthContext';
+import ApiService from '../../services/ApiService';
 
 interface BillingSettings {
   stripe_account_connected: boolean;
@@ -22,26 +21,19 @@ interface AdminProfile {
   first_name: string;
   last_name: string;
   company: string;
+  avatar?: string;
+  bio?: string;
   created_at: string;
 }
 
 const AdminSettings: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'notifications' | 'security' | 'danger'>('profile');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
   const [billingSettings, setBillingSettings] = useState<BillingSettings | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false
-  });
 
+  // Profile state
   const [profileData, setProfileData] = useState<AdminProfile>({
     id: '',
     username: '',
@@ -49,16 +41,38 @@ const AdminSettings: React.FC = () => {
     first_name: '',
     last_name: '',
     company: '',
+    bio: '',
     created_at: ''
   });
 
+  // Password state
+  const [passwordData, setPasswordData] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
+  });
+
+  const [showPassword, setShowPassword] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+
+  // Photo state
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(user?.avatar || null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+
+  // Notifications state
   const [notifications, setNotifications] = useState({
     email_invoices: true,
     email_new_clients: true,
     email_system_alerts: true,
-    push_notifications: false,
     weekly_reports: true
   });
+
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   useEffect(() => {
     fetchAdminData();
@@ -68,12 +82,20 @@ const AdminSettings: React.FC = () => {
     try {
       setLoading(true);
       const [billingData, userData] = await Promise.all([
-        ApiService.getAdminBillingSettings(),
+        ApiService.getAdminBillingSettings().catch(() => ({
+          stripe_account_connected: false,
+          total_revenue_this_month: 0,
+          pending_payments: 0
+        })),
         ApiService.getCurrentUser()
       ]);
 
       setBillingSettings(billingData as BillingSettings);
       setProfileData(userData as AdminProfile);
+      const typedUserData = userData as AdminProfile;
+      if (typedUserData.avatar) {
+        setProfilePhoto(typedUserData.avatar);
+      }
     } catch (error) {
       console.error('Failed to fetch admin data:', error);
     } finally {
@@ -81,56 +103,104 @@ const AdminSettings: React.FC = () => {
     }
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      await ApiService.updateProfile(profileData);
-      alert('Profile updated successfully');
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-      alert('Failed to update profile');
-    } finally {
-      setLoading(false);
-    }
+  // Get user initials
+  const getInitials = () => {
+    const firstName = profileData.first_name || user?.first_name || '';
+    const lastName = profileData.last_name || user?.last_name || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'A';
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (newPassword !== confirmPassword) {
-      alert('New passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      alert('Password must be at least 8 characters long');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await ApiService.changePassword({
-        current_password: currentPassword,
-        new_password: newPassword
-      });
+  // Handle photo upload
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size must be less than 5MB');
+        return;
+      }
       
-      alert('Password changed successfully');
-      setShowPasswordModal(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      alert('Failed to change password. Please check your current password.');
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const updatedProfile = await ApiService.updateProfileWithAvatar(
+        {
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          company: profileData.company,
+          bio: profileData.bio,
+        },
+        photoFile || undefined
+      );
+
+      setSuccess('Profile updated successfully!');
+      if (updatedProfile.avatar) {
+        setProfilePhoto(updatedProfile.avatar);
+      }
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle password change
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      setError('New passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordData.new_password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await ApiService.changePassword({
+        current_password: passwordData.current_password,
+        new_password: passwordData.new_password,
+      });
+
+      setSuccess('Password changed successfully!');
+      setPasswordData({
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
+      });
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle account deletion
   const handleDeleteAccount = async () => {
     if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
-      alert('Please type "DELETE MY ACCOUNT" exactly to confirm');
+      setError('Please type "DELETE MY ACCOUNT" exactly to confirm');
       return;
     }
 
@@ -141,25 +211,7 @@ const AdminSettings: React.FC = () => {
       await logout();
     } catch (error) {
       console.error('Failed to delete account:', error);
-      alert('Failed to delete account. Please contact support.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConnectStripe = () => {
-    // In a real implementation, this would redirect to Stripe Connect
-    alert('Redirecting to Stripe Connect... (Not implemented in demo)');
-  };
-
-  const handleExportData = async () => {
-    try {
-      setLoading(true);
-      // Implement data export
-      alert('Data export initiated. You will receive an email when ready.');
-    } catch (error) {
-      console.error('Failed to export data:', error);
-      alert('Failed to export data');
+      setError('Failed to delete account. Please contact support.');
     } finally {
       setLoading(false);
     }
@@ -189,450 +241,430 @@ const AdminSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Settings</h1>
-          <p className="text-gray-600 mt-1">Manage your account, billing, and system preferences</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Admin Settings</h1>
+        <p className="text-gray-600 mt-1">Manage your admin account and system preferences</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="border-b">
-          <div className="flex space-x-8 px-6">
-            {[
-              { id: 'profile', label: 'Profile', icon: User },
-              { id: 'billing', label: 'Billing & Payments', icon: CreditCard },
-              { id: 'notifications', label: 'Notifications', icon: Bell },
-              { id: 'security', label: 'Security', icon: Shield },
-              { id: 'danger', label: 'Danger Zone', icon: AlertTriangle }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-2 py-4 border-b-2 transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-purple-600 text-purple-600'
-                      : 'border-transparent text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
+          <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" />
+          <span className="text-sm text-green-800">{success}</span>
         </div>
+      )}
 
-        <div className="p-6">
-          {/* Profile Tab */}
-          {activeTab === 'profile' && (
-            <div className="space-y-6">
-              <Card title="Profile Information">
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      label="First Name"
-                      value={profileData.first_name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, first_name: e.target.value})}
-                      required
-                    />
-                    <Input
-                      label="Last Name"
-                      value={profileData.last_name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, last_name: e.target.value})}
-                      required
-                    />
-                  </div>
-                  
-                  <Input
-                    label="Email"
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, email: e.target.value})}
-                    required
-                  />
-                  
-                  <Input
-                    label="Company"
-                    value={profileData.company}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData({...profileData, company: e.target.value})}
-                  />
-                  
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={loading}>
-                      {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      Save Changes
-                    </Button>
-                  </div>
-                </form>
-              </Card>
-
-              <Card title="Account Information">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Username</label>
-                    <p className="text-gray-900 font-medium">{profileData.username}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Account Created</label>
-                    <p className="text-gray-900 font-medium">
-                      {new Date(profileData.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Role</label>
-                    <Badge variant="primary">Admin</Badge>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Account ID</label>
-                    <p className="text-gray-900 font-mono text-sm">{profileData.id}</p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Billing Tab */}
-          {activeTab === 'billing' && billingSettings && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100">Revenue This Month</p>
-                      <p className="text-3xl font-bold">{formatCurrency(billingSettings.total_revenue_this_month)}</p>
-                    </div>
-                    <DollarSign className="w-10 h-10 text-green-200" />
-                  </div>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-yellow-100">Pending Payments</p>
-                      <p className="text-3xl font-bold">{billingSettings.pending_payments}</p>
-                    </div>
-                    <CreditCard className="w-10 h-10 text-yellow-200" />
-                  </div>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-100">Stripe Status</p>
-                      <p className="text-lg font-bold">
-                        {billingSettings.stripe_account_connected ? 'Connected' : 'Not Connected'}
-                      </p>
-                    </div>
-                    <Shield className="w-10 h-10 text-blue-200" />
-                  </div>
-                </Card>
-              </div>
-
-              <Card title="Payment Settings">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h3 className="font-medium text-gray-900">Stripe Account</h3>
-                      <p className="text-sm text-gray-600">
-                        {billingSettings.stripe_account_connected 
-                          ? 'Your Stripe account is connected and ready to receive payments'
-                          : 'Connect your Stripe account to receive payments from clients'
-                        }
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge variant={billingSettings.stripe_account_connected ? 'success' : 'warning'}>
-                        {billingSettings.stripe_account_connected ? 'Connected' : 'Not Connected'}
-                      </Badge>
-                      {!billingSettings.stripe_account_connected && (
-                        <Button onClick={handleConnectStripe}>
-                          Connect Stripe
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {billingSettings.stripe_account_connected && (
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <div className="flex items-start">
-                        <Check className="w-5 h-5 text-green-600 mt-0.5 mr-3" />
-                        <div>
-                          <p className="text-sm text-green-900 font-medium">Payments are being processed</p>
-                          <p className="text-sm text-green-700 mt-1">
-                            Client payments will be automatically transferred to your connected Stripe account.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              <Card title="Billing History">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-600">Download your complete billing history and transaction records</p>
-                    <Button variant="outline" onClick={handleExportData}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export Data
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <Card title="Email Notifications">
-                <div className="space-y-4">
-                  {[
-                    { key: 'email_invoices', label: 'Invoice Payments', description: 'Get notified when clients pay invoices' },
-                    { key: 'email_new_clients', label: 'New Client Signups', description: 'Get notified when new clients register' },
-                    { key: 'email_system_alerts', label: 'System Alerts', description: 'Important system notifications and errors' },
-                    { key: 'weekly_reports', label: 'Weekly Reports', description: 'Automated weekly performance reports' }
-                  ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{item.label}</p>
-                        <p className="text-sm text-gray-600">{item.description}</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={notifications[item.key as keyof typeof notifications]}
-                          onChange={(e) => setNotifications({
-                            ...notifications,
-                            [item.key]: e.target.checked
-                          })}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card title="Push Notifications">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">Browser Notifications</p>
-                      <p className="text-sm text-gray-600">Receive push notifications in your browser</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notifications.push_notifications}
-                        onChange={(e) => setNotifications({
-                          ...notifications,
-                          push_notifications: e.target.checked
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Security Tab */}
-          {activeTab === 'security' && (
-            <div className="space-y-6">
-              <Card title="Password & Authentication">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h3 className="font-medium text-gray-900">Password</h3>
-                      <p className="text-sm text-gray-600">Last changed 3 months ago</p>
-                    </div>
-                    <Button onClick={() => setShowPasswordModal(true)}>
-                      Change Password
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-
-              <Card title="Data & Privacy">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h3 className="font-medium text-gray-900">Export Data</h3>
-                      <p className="text-sm text-gray-600">Download all your account data</p>
-                    </div>
-                    <Button variant="outline" onClick={handleExportData}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {/* Danger Zone Tab */}
-          {activeTab === 'danger' && (
-            <div className="space-y-6">
-              <Card className="border-red-200 bg-red-50">
-                <div className="flex items-start">
-                  <AlertTriangle className="w-6 h-6 text-red-600 mt-1 mr-3 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-red-900 mb-2">Danger Zone</h3>
-                    <p className="text-red-700 mb-4">
-                      These actions are irreversible. Please proceed with caution.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <div className="border border-red-200 rounded-lg p-4 bg-white">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium text-gray-900">Delete Admin Account</h4>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Permanently delete your admin account and all associated data. This cannot be undone.
-                            </p>
-                          </div>
-                          <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete Account
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
+          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+          <span className="text-sm text-red-800">{error}</span>
         </div>
-      </div>
+      )}
 
-      {/* Change Password Modal */}
-      <Modal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
-        title="Change Password"
-        size="md"
-      >
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <div className="relative">
-            <Input
-              label="Current Password"
-              type={showPasswords.current ? 'text' : 'password'}
-              value={currentPassword}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPasswords({...showPasswords, current: !showPasswords.current})}
-              className="absolute right-3 top-8 text-gray-400 hover:text-gray-600"
-            >
-              {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          
-          <div className="relative">
-            <Input
-              label="New Password"
-              type={showPasswords.new ? 'text' : 'password'}
-              value={newPassword}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPasswords({...showPasswords, new: !showPasswords.new})}
-              className="absolute right-3 top-8 text-gray-400 hover:text-gray-600"
-            >
-              {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          
-          <div className="relative">
-            <Input
-              label="Confirm New Password"
-              type={showPasswords.confirm ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPasswords({...showPasswords, confirm: !showPasswords.confirm})}
-              className="absolute right-3 top-8 text-gray-400 hover:text-gray-600"
-            >
-              {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setShowPasswordModal(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Change Password
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Delete Account Modal */}
-      <Modal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        title="Delete Admin Account"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-            <div className="flex items-start">
-              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3" />
+      {/* Billing Overview - Admin Only */}
+      {billingSettings && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-sm p-6 text-white">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-red-900 font-medium">This action cannot be undone</p>
-                <p className="text-sm text-red-700 mt-1">
-                  This will permanently delete your admin account, all client data, and cannot be recovered.
+                <p className="text-green-100 text-sm mb-1">Revenue This Month</p>
+                <p className="text-3xl font-bold">{formatCurrency(billingSettings.total_revenue_this_month)}</p>
+              </div>
+              <DollarSign className="w-12 h-12 text-green-200" />
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-sm p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-100 text-sm mb-1">Pending Payments</p>
+                <p className="text-3xl font-bold">{billingSettings.pending_payments}</p>
+              </div>
+              <CreditCard className="w-12 h-12 text-yellow-200" />
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-sm p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm mb-1">System Status</p>
+                <p className="text-lg font-bold">
+                  {billingSettings.stripe_account_connected ? 'Connected' : 'Setup Required'}
                 </p>
               </div>
+              <Shield className="w-12 h-12 text-purple-200" />
             </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Type "DELETE MY ACCOUNT" to confirm:
-            </label>
-            <input
-              type="text"
-              value={deleteConfirmation}
-              onChange={(e) => setDeleteConfirmation(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-              placeholder="DELETE MY ACCOUNT"
-            />
-          </div>
-          
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setShowDeleteModal(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="danger" 
-              onClick={handleDeleteAccount}
-              disabled={deleteConfirmation !== 'DELETE MY ACCOUNT' || loading}
-            >
-              {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              Delete Account
-            </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Profile Photo Card */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Camera className="w-5 h-5 mr-2 text-purple-600" />
+              Profile Photo
+            </h2>
+            
+            <div className="flex flex-col items-center">
+              <div className="relative group mb-4">
+                {profilePhoto ? (
+                  <img
+                    src={profilePhoto}
+                    alt="Profile"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-purple-100"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center border-4 border-purple-100">
+                    <span className="text-4xl font-bold text-white">{getInitials()}</span>
+                  </div>
+                )}
+                
+                <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <Upload className="w-8 h-8 text-white" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <p className="text-sm text-gray-600 text-center mb-4">
+                Click to upload a new photo
+              </p>
+              
+              <p className="text-xs text-gray-500 text-center">
+                JPG, PNG or GIF (max. 5MB)
+              </p>
+
+              {/* Admin Badge */}
+              <div className="mt-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full">
+                <span className="text-white text-sm font-semibold">Admin Account</span>
+              </div>
+            </div>
           </div>
         </div>
-      </Modal>
+
+        {/* Profile Information Card */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+              <User className="w-5 h-5 mr-2 text-purple-600" />
+              Profile Information
+            </h2>
+
+            <form onSubmit={handleProfileUpdate} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.first_name}
+                    onChange={(e) => setProfileData({ ...profileData, first_name: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="Enter first name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.last_name}
+                    onChange={(e) => setProfileData({ ...profileData, last_name: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={profileData.email}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company Name
+                </label>
+                <input
+                  type="text"
+                  value={profileData.company}
+                  onChange={(e) => setProfileData({ ...profileData, company: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  placeholder="Enter company name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Bio
+                </label>
+                <textarea
+                  value={profileData.bio}
+                  onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
+                  placeholder="Tell us about yourself..."
+                  maxLength={500}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {(profileData.bio || '').length}/500 characters
+                </p>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Change Password Card */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+          <Lock className="w-5 h-5 mr-2 text-purple-600" />
+          Change Password
+        </h2>
+
+        <form onSubmit={handlePasswordChange} className="max-w-2xl">
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword.current ? 'text' : 'password'}
+                  value={passwordData.current_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
+                  className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  placeholder="Enter current password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword({ ...showPassword, current: !showPassword.current })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword.new ? 'text' : 'password'}
+                  value={passwordData.new_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                  className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  placeholder="Enter new password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword({ ...showPassword, new: !showPassword.new })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword.confirm ? 'text' : 'password'}
+                  value={passwordData.confirm_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
+                  className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  placeholder="Confirm new password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword({ ...showPassword, confirm: !showPassword.confirm })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Password must contain:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li className="flex items-center">
+                  <span className={`w-1.5 h-1.5 rounded-full mr-2 ${passwordData.new_password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                  At least 8 characters
+                </li>
+                <li className="flex items-center">
+                  <span className={`w-1.5 h-1.5 rounded-full mr-2 ${/[A-Z]/.test(passwordData.new_password) && /[a-z]/.test(passwordData.new_password) ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                  Upper & lowercase letters
+                </li>
+                <li className="flex items-center">
+                  <span className={`w-1.5 h-1.5 rounded-full mr-2 ${/[0-9]/.test(passwordData.new_password) ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                  At least one number
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                {loading ? 'Changing...' : 'Change Password'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* Notification Preferences */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+          <Bell className="w-5 h-5 mr-2 text-purple-600" />
+          Notification Preferences
+        </h2>
+
+        <div className="space-y-4 max-w-2xl">
+          {[
+            { key: 'email_invoices', label: 'Invoice Payments', description: 'Get notified when clients pay invoices' },
+            { key: 'email_new_clients', label: 'New Client Signups', description: 'Get notified when new clients register' },
+            { key: 'email_system_alerts', label: 'System Alerts', description: 'Important system notifications and errors' },
+            { key: 'weekly_reports', label: 'Weekly Reports', description: 'Automated weekly performance reports' }
+          ].map((item) => (
+            <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-gray-900">{item.label}</p>
+                <p className="text-sm text-gray-600">{item.description}</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notifications[item.key as keyof typeof notifications]}
+                  onChange={(e) => setNotifications({
+                    ...notifications,
+                    [item.key]: e.target.checked
+                  })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-white rounded-xl shadow-sm border-2 border-red-200 p-6">
+        <div className="flex items-start">
+          <AlertTriangle className="w-6 h-6 text-red-600 mt-1 mr-3 flex-shrink-0" />
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-red-900 mb-2">Danger Zone</h2>
+            <p className="text-red-700 mb-6">
+              These actions are irreversible. Please proceed with extreme caution.
+            </p>
+            
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-medium text-gray-900">Delete Admin Account</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Permanently delete your admin account and all associated data
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-all flex items-center"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Account
+                </button>
+              </div>
+
+              {showDeleteModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                    <div className="flex items-start mb-4">
+                      <AlertTriangle className="w-6 h-6 text-red-600 mt-1 mr-3 flex-shrink-0" />
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Delete Admin Account</h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          This action cannot be undone. All data will be permanently deleted.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Type "DELETE MY ACCOUNT" to confirm:
+                      </label>
+                      <input
+                        type="text"
+                        value={deleteConfirmation}
+                        onChange={(e) => setDeleteConfirmation(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        placeholder="DELETE MY ACCOUNT"
+                      />
+                    </div>
+
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowDeleteModal(false);
+                          setDeleteConfirmation('');
+                        }}
+                        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDeleteAccount}
+                        disabled={deleteConfirmation !== 'DELETE MY ACCOUNT' || loading}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      >
+                        {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                        Delete Forever
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
