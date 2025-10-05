@@ -1,4 +1,4 @@
-# server/api/views/client/content_views.py - Complete rewrite
+# server/api/views/client/content_views.py - Complete with Admin Features
 
 from rest_framework import status
 from rest_framework.decorators import action
@@ -8,7 +8,11 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils import timezone
 from django.db.models import Q
+from django.http import HttpResponse, JsonResponse
 import logging
+import json
+import zipfile
+import io
 
 from ...models import ContentPost, ContentImage, Client, SocialMediaAccount
 from ...serializers import ContentPostSerializer, ContentImageSerializer
@@ -17,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class ContentPostViewSet(ModelViewSet):
-    """Content management viewset - FIXED"""
+    """Content management viewset - COMPLETE with Admin Features"""
     serializer_class = ContentPostSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -62,6 +66,7 @@ class ContentPostViewSet(ModelViewSet):
         return queryset.select_related('client', 'social_account', 'approved_by').prefetch_related('images').order_by('-scheduled_date')
     
     def create(self, request, *args, **kwargs):
+        """Create content post - Both Client and Admin"""
         try:
             logger.info(f"Content creation request from {request.user.email}")
             logger.info(f"Request data: {request.data}")
@@ -76,7 +81,7 @@ class ContentPostViewSet(ModelViewSet):
                         status=status.HTTP_404_NOT_FOUND
                     )
             else:
-                # Admin can specify client
+                # Admin MUST specify client when creating content
                 client_id = request.data.get('client')
                 if not client_id:
                     return Response(
@@ -101,7 +106,7 @@ class ContentPostViewSet(ModelViewSet):
                 uploaded_images = image_files
                 logger.info(f"Received {len(uploaded_images)} images")
             
-            # FIXED: Handle social account - fetch the actual instance, not just the ID
+            # Handle social account - fetch the actual instance
             social_account = None
             social_account_id = data.get('social_account')
             if social_account_id:
@@ -126,14 +131,24 @@ class ContentPostViewSet(ModelViewSet):
                 'content': data.get('content', ''),
                 'scheduled_date': data.get('scheduled_date'),
                 'admin_message': data.get('admin_message', ''),
-                'social_account': social_account,  # NOW it's an instance, not a string
+                'social_account': social_account,
             }
             
-            # Set status based on user role
+            # Set status based on user role and intent
             if request.user.role == 'client':
+                # Client creates content for admin approval
                 content_data['status'] = 'pending-approval'
             else:
-                content_data['status'] = data.get('status', 'approved')
+                # Admin creates content - check if it needs client approval
+                needs_approval = data.get('needs_client_approval', False)
+                if needs_approval:
+                    content_data['status'] = 'pending-approval'
+                else:
+                    content_data['status'] = data.get('status', 'approved')
+                    # Auto-approve if admin doesn't need client approval
+                    if content_data['status'] == 'approved':
+                        content_data['approved_by'] = request.user
+                        content_data['approved_at'] = timezone.now()
             
             # Create the post
             content_post = ContentPost.objects.create(
@@ -162,6 +177,85 @@ class ContentPostViewSet(ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    def update(self, request, *args, **kwargs):
+        """Update content post - Both Client and Admin can edit"""
+        try:
+            partial = kwargs.pop('partial', False)
+            instance = self.get_object()
+            
+            # Permission check
+            if request.user.role == 'client':
+                # Clients can only edit their own content
+                try:
+                    client = request.user.client_profile
+                    if instance.client != client:
+                        return Response(
+                            {'error': 'Permission denied'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                except Client.DoesNotExist:
+                    return Response(
+                        {'error': 'Client profile not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            # Admin can edit any content
+            
+            # Handle new images if uploaded
+            image_files = request.FILES.getlist('images')
+            if image_files:
+                # Add new images (don't delete old ones unless specified)
+                delete_old = request.data.get('delete_old_images', False)
+                if delete_old:
+                    instance.images.all().delete()
+                
+                for i, image_file in enumerate(image_files):
+                    ContentImage.objects.create(
+                        content_post=instance,
+                        image=image_file,
+                        order=instance.images.count() + i
+                    )
+            
+            # Handle social account update
+            social_account_id = request.data.get('social_account')
+            if social_account_id:
+                try:
+                    social_account = SocialMediaAccount.objects.get(id=social_account_id)
+                    if social_account.client != instance.client:
+                        return Response(
+                            {'error': 'Social account does not belong to this client'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                    instance.social_account = social_account
+                except SocialMediaAccount.DoesNotExist:
+                    return Response(
+                        {'error': 'Social account not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # Update other fields
+            updateable_fields = ['title', 'content', 'scheduled_date', 'admin_message', 'platform']
+            for field in updateable_fields:
+                if field in request.data:
+                    setattr(instance, field, request.data[field])
+            
+            # If client edits, reset to pending-approval
+            if request.user.role == 'client' and instance.status == 'approved':
+                instance.status = 'pending-approval'
+                instance.approved_by = None
+                instance.approved_at = None
+            
+            instance.save()
+            
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Content update error: {str(e)}", exc_info=True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         """Approve content post"""
@@ -184,7 +278,11 @@ class ContentPostViewSet(ModelViewSet):
             return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
         
         content = self.get_object()
+        feedback = request.data.get('feedback', '')
+        
         content.status = 'draft'
+        if feedback:
+            content.admin_message = feedback
         content.save()
         
         serializer = self.get_serializer(content)
@@ -219,6 +317,108 @@ class ContentPostViewSet(ModelViewSet):
         
         serializer = self.get_serializer(content)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """Download post content as JSON with image URLs"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        content = self.get_object()
+        
+        # Prepare download data
+        download_data = {
+            'title': content.title,
+            'description': content.content,
+            'platform': content.platform,
+            'scheduled_date': content.scheduled_date.isoformat(),
+            'client_name': content.client.name,
+            'images': [],
+            'admin_message': content.admin_message,
+            'social_account': content.social_account.username if content.social_account else None
+        }
+        
+        # Add image URLs
+        for img in content.images.all():
+            download_data['images'].append({
+                'url': request.build_absolute_uri(img.image.url),
+                'caption': img.caption,
+                'order': img.order
+            })
+        
+        response = JsonResponse(download_data)
+        response['Content-Disposition'] = f'attachment; filename="post_{content.id}.json"'
+        return response
+    
+    @action(detail=True, methods=['get'])
+    def download_images(self, request, pk=None):
+        """Download all post images as a ZIP file"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        content = self.get_object()
+        images = content.images.all()
+        
+        if not images:
+            return Response(
+                {'error': 'No images to download'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Create ZIP file in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add metadata file
+            metadata = {
+                'title': content.title,
+                'description': content.content,
+                'platform': content.platform,
+                'scheduled_date': content.scheduled_date.isoformat(),
+                'client_name': content.client.name
+            }
+            zip_file.writestr('post_info.json', json.dumps(metadata, indent=2))
+            
+            # Add each image
+            for i, img in enumerate(images):
+                try:
+                    img.image.open()
+                    image_data = img.image.read()
+                    # Get file extension
+                    ext = img.image.name.split('.')[-1]
+                    filename = f"image_{i+1}.{ext}"
+                    zip_file.writestr(filename, image_data)
+                except Exception as e:
+                    logger.error(f"Error reading image {img.id}: {e}")
+        
+        # Prepare response
+        zip_buffer.seek(0)
+        response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="post_{content.id}_images.zip"'
+        return response
+    
+    @action(detail=True, methods=['delete'])
+    def delete_image(self, request, pk=None):
+        """Delete a specific image from the post"""
+        content = self.get_object()
+        image_id = request.data.get('image_id')
+        
+        if not image_id:
+            return Response(
+                {'error': 'Image ID is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            image = ContentImage.objects.get(id=image_id, content_post=content)
+            image.delete()
+            
+            serializer = self.get_serializer(content)
+            return Response(serializer.data)
+        except ContentImage.DoesNotExist:
+            return Response(
+                {'error': 'Image not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
     
     @action(detail=False, methods=['get'])
     def by_platform(self, request):
@@ -255,3 +455,37 @@ class ContentPostViewSet(ModelViewSet):
             calendar_data[date_key].append(self.get_serializer(post).data)
         
         return Response(dict(calendar_data))
+    
+    @action(detail=False, methods=['post'])
+    def bulk_approve(self, request):
+        """Bulk approve content"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        content_ids = request.data.get('content_ids', [])
+        action_type = request.data.get('action', 'approve')
+        feedback = request.data.get('feedback', '')
+        
+        if not content_ids:
+            return Response(
+                {'error': 'Content IDs are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        content_posts = ContentPost.objects.filter(id__in=content_ids)
+        
+        if action_type == 'approve':
+            content_posts.update(
+                status='approved',
+                approved_by=request.user,
+                approved_at=timezone.now()
+            )
+            message = f'{content_posts.count()} posts approved'
+        else:  # reject
+            update_data = {'status': 'draft'}
+            if feedback:
+                update_data['admin_message'] = feedback
+            content_posts.update(**update_data)
+            message = f'{content_posts.count()} posts rejected'
+        
+        return Response({'message': message, 'count': content_posts.count()})

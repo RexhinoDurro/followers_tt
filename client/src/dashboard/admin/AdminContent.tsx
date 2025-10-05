@@ -1,11 +1,10 @@
-// client/src/dashboard/admin/AdminContent.tsx - Complete Implementation
+// client/src/dashboard/admin/AdminContent.tsx - COMPLETE with ALL Features
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Calendar, Clock, Eye, Heart, MessageCircle,
-  Share2, TrendingUp, Edit,
-  CheckCircle, XCircle, Search,
-  BarChart3
-} from 'lucide-react';
+  Share2, TrendingUp, Edit, CheckCircle, XCircle, Search,
+  BarChart3, Download, Upload, ExternalLink
+  } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
 
@@ -14,15 +13,22 @@ interface ContentPost {
   client: string;
   client_name: string;
   platform: string;
+  title: string;
   content: string;
   scheduled_date: string;
   status: 'draft' | 'pending-approval' | 'approved' | 'posted';
-  image_url?: string;
+  images?: Array<{ id: string; image_url: string; caption?: string; order: number }>;
   engagement_rate?: number;
   approved_by?: string;
   approved_by_name?: string;
   approved_at?: string;
   posted_at?: string;
+  post_url?: string;
+  admin_message?: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  views?: number;
   created_at: string;
   updated_at: string;
 }
@@ -44,16 +50,39 @@ const AdminContent: React.FC = () => {
   const [filterPlatform, setFilterPlatform] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateContent, setShowCreateContent] = useState(false);
-  const [showContentDetails, setShowContentDetails] = useState<ContentPost | null>(null);
+  const [showEditModal, setShowEditModal] = useState<ContentPost | null>(null);
+  const [showPostModal, setShowPostModal] = useState<ContentPost | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
 
   const [newContent, setNewContent] = useState({
     client: '',
     platform: 'instagram',
+    title: '',
     content: '',
     scheduled_date: '',
-    image_url: ''
+    admin_message: '',
+    images: [] as File[],
+    needs_client_approval: false
   });
+
+  const [editContent, setEditContent] = useState({
+    title: '',
+    content: '',
+    scheduled_date: '',
+    admin_message: '',
+    images: [] as File[],
+    delete_old_images: false
+  });
+
+  const [postData, setPostData] = useState({
+    post_url: '',
+    likes: 0,
+    comments: 0,
+    shares: 0,
+    views: 0
+  });
+
+  const [imagePreview, setImagePreview] = useState<string[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -79,22 +108,178 @@ const AdminContent: React.FC = () => {
   const handleCreateContent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await ApiService.createContent({
-        ...newContent,
-        status: 'approved' // Admin can directly approve
+      const formData = new FormData();
+      formData.append('client', newContent.client);
+      formData.append('platform', newContent.platform);
+      formData.append('title', newContent.title);
+      formData.append('content', newContent.content);
+      formData.append('scheduled_date', newContent.scheduled_date);
+      formData.append('admin_message', newContent.admin_message);
+      formData.append('needs_client_approval', newContent.needs_client_approval.toString());
+      
+      newContent.images.forEach((img) => {
+        formData.append('images', img);
       });
+
+      await ApiService.createContent(formData);
       await fetchData();
       setShowCreateContent(false);
       setNewContent({
         client: '',
         platform: 'instagram',
+        title: '',
         content: '',
         scheduled_date: '',
-        image_url: ''
+        admin_message: '',
+        images: [],
+        needs_client_approval: false
       });
+      setImagePreview([]);
     } catch (error) {
       console.error('Failed to create content:', error);
+      alert('Failed to create content');
     }
+  };
+
+  const handleEditContent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showEditModal) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('title', editContent.title);
+      formData.append('content', editContent.content);
+      formData.append('scheduled_date', editContent.scheduled_date);
+      formData.append('admin_message', editContent.admin_message);
+      formData.append('delete_old_images', editContent.delete_old_images.toString());
+      
+      editContent.images.forEach((img) => {
+        formData.append('images', img);
+      });
+
+      await ApiService.updateContent(showEditModal.id, formData);
+      await fetchData();
+      setShowEditModal(null);
+      setEditContent({
+        title: '',
+        content: '',
+        scheduled_date: '',
+        admin_message: '',
+        images: [],
+        delete_old_images: false
+      });
+      setImagePreview([]);
+    } catch (error) {
+      console.error('Failed to update content:', error);
+      alert('Failed to update content');
+    }
+  };
+
+  const handleMarkPosted = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showPostModal) return;
+
+    try {
+      await ApiService.markContentPosted(showPostModal.id, postData);
+      await fetchData();
+      setShowPostModal(null);
+      setPostData({
+        post_url: '',
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        views: 0
+      });
+    } catch (error) {
+      console.error('Failed to mark as posted:', error);
+      alert('Failed to mark as posted');
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (isEdit) {
+      setEditContent(prev => ({ ...prev, images: files }));
+    } else {
+      setNewContent(prev => ({ ...prev, images: files }));
+    }
+    
+    const previews = files.map(file => URL.createObjectURL(file));
+    setImagePreview(previews);
+  };
+
+  const handleDownloadPost = async (postId: string) => {
+    try {
+      const response = await fetch(`${ApiService.getBaseURL()}/content/${postId}/download/`, {
+        headers: {
+          'Authorization': `Token ${ApiService.getToken()}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `post_${postId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download post data');
+    }
+  };
+
+  const handleDownloadImages = async (postId: string) => {
+    try {
+      const response = await fetch(`${ApiService.getBaseURL()}/content/${postId}/download_images/`, {
+        headers: {
+          'Authorization': `Token ${ApiService.getToken()}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `post_${postId}_images.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download images');
+    }
+  };
+
+  const openEditModal = (post: ContentPost) => {
+    setShowEditModal(post);
+    setEditContent({
+      title: post.title,
+      content: post.content,
+      scheduled_date: post.scheduled_date,
+      admin_message: post.admin_message || '',
+      images: [],
+      delete_old_images: false
+    });
+  };
+
+  const openPostModal = (post: ContentPost) => {
+    setShowPostModal(post);
+    setPostData({
+      post_url: post.post_url || '',
+      likes: post.likes || 0,
+      comments: post.comments || 0,
+      shares: post.shares || 0,
+      views: post.views || 0
+    });
   };
 
   const handleApproveContent = async (contentId: string) => {
@@ -167,6 +352,7 @@ const AdminContent: React.FC = () => {
     const matchesPlatform = filterPlatform === 'all' || post.platform === filterPlatform;
     const matchesSearch = searchTerm === '' || 
       post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      post.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       post.client_name.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesClient && matchesStatus && matchesPlatform && matchesSearch;
@@ -342,9 +528,6 @@ const AdminContent: React.FC = () => {
               <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
               <option value="youtube">YouTube</option>
-              <option value="facebook">Facebook</option>
-              <option value="twitter">Twitter</option>
-              <option value="linkedin">LinkedIn</option>
             </select>
           </div>
           
@@ -385,20 +568,27 @@ const AdminContent: React.FC = () => {
                 </div>
               </div>
               
-              {post.image_url && (
-                <div className="h-48 bg-gray-100 -mx-6 -mt-6 mb-4 overflow-hidden">
+              {/* Images Display */}
+              {post.images && post.images.length > 0 && (
+                <div className="h-48 bg-gray-100 -mx-6 -mt-6 mb-4 overflow-hidden relative">
                   <img 
-                    src={post.image_url} 
+                    src={post.images[0].image_url} 
                     alt="Content preview" 
                     className="w-full h-full object-cover"
                   />
+                  {post.images.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                      +{post.images.length - 1} more
+                    </div>
+                  )}
                 </div>
               )}
               
               <div className="space-y-3">
                 <div>
                   <p className="text-sm text-gray-600">{post.client_name}</p>
-                  <p className="font-medium text-gray-900 capitalize">{post.platform}</p>
+                  {post.title && <p className="font-bold text-gray-900">{post.title}</p>}
+                  <p className="font-medium text-gray-700 capitalize">{post.platform}</p>
                 </div>
                 
                 <p className="text-gray-700 text-sm line-clamp-3">
@@ -419,46 +609,112 @@ const AdminContent: React.FC = () => {
                 </div>
               </div>
               
-              {post.status === 'pending-approval' && (
-                <div className="flex gap-2 mt-4 pt-4 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="success"
-                    className="flex-1"
-                    onClick={() => handleApproveContent(post.id)}
-                  >
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    Approve
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => handleRejectContent(post.id)}
-                  >
-                    <XCircle className="w-4 h-4 mr-1" />
-                    Reject
-                  </Button>
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+                {post.status === 'pending-approval' && (
+                  <>
+                    <Button 
+                      size="sm" 
+                      variant="success"
+                      className="flex-1"
+                      onClick={() => handleApproveContent(post.id)}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Approve
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleRejectContent(post.id)}
+                    >
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Reject
+                    </Button>
+                  </>
+                )}
+                
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setShowContentDetails(post)}
+                  onClick={() => openEditModal(post)}
+                  className="flex-1"
                 >
-                  <Eye className="w-4 h-4 mr-1" />
-                  Details
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
                 </Button>
-                {post.status === 'posted' && (
-                  <div className="flex gap-1 text-sm text-gray-600">
-                    <Heart className="w-4 h-4" />
-                    <MessageCircle className="w-4 h-4" />
-                    <Share2 className="w-4 h-4" />
-                  </div>
+                
+                {post.status === 'approved' && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => openPostModal(post)}
+                    className="flex-1"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    Mark Posted
+                  </Button>
+                )}
+                
+                {post.images && post.images.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownloadImages(post.id)}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Images
+                  </Button>
+                )}
+                
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownloadPost(post.id)}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Data
+                </Button>
+                
+                {post.post_url && (
+                  <a
+                    href={post.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1"
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      View Post
+                    </Button>
+                  </a>
                 )}
               </div>
+              
+              {post.status === 'posted' && (
+                <div className="flex gap-3 text-sm text-gray-600 mt-3 pt-3 border-t">
+                  <span className="flex items-center">
+                    <Heart className="w-4 h-4 mr-1 text-pink-500" />
+                    {post.likes || 0}
+                  </span>
+                  <span className="flex items-center">
+                    <MessageCircle className="w-4 h-4 mr-1 text-blue-500" />
+                    {post.comments || 0}
+                  </span>
+                  <span className="flex items-center">
+                    <Share2 className="w-4 h-4 mr-1 text-green-500" />
+                    {post.shares || 0}
+                  </span>
+                  <span className="flex items-center">
+                    <Eye className="w-4 h-4 mr-1 text-purple-500" />
+                    {post.views || 0}
+                  </span>
+                </div>
+              )}
             </Card>
           ))}
         </div>
@@ -484,9 +740,10 @@ const AdminContent: React.FC = () => {
                       }}
                     />
                   </th>
+                  <th className="text-left pb-3 font-medium text-gray-900">Images</th>
                   <th className="text-left pb-3 font-medium text-gray-900">Client</th>
                   <th className="text-left pb-3 font-medium text-gray-900">Platform</th>
-                  <th className="text-left pb-3 font-medium text-gray-900">Content</th>
+                  <th className="text-left pb-3 font-medium text-gray-900">Title/Content</th>
                   <th className="text-left pb-3 font-medium text-gray-900">Scheduled</th>
                   <th className="text-left pb-3 font-medium text-gray-900">Status</th>
                   <th className="text-left pb-3 font-medium text-gray-900">Actions</th>
@@ -502,6 +759,22 @@ const AdminContent: React.FC = () => {
                         onChange={() => toggleContentSelection(post)}
                       />
                     </td>
+                    <td className="py-4">
+                      {post.images && post.images.length > 0 ? (
+                        <div className="flex gap-1">
+                          <img 
+                            src={post.images[0].image_url} 
+                            alt="Preview" 
+                            className="w-12 h-12 object-cover rounded"
+                          />
+                          {post.images.length > 1 && (
+                            <span className="text-xs text-gray-500">+{post.images.length - 1}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No images</span>
+                      )}
+                    </td>
                     <td className="py-4 text-gray-900">{post.client_name}</td>
                     <td className="py-4">
                       <div className="flex items-center gap-2">
@@ -510,7 +783,8 @@ const AdminContent: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-4">
-                      <p className="text-gray-700 truncate max-w-xs">{post.content}</p>
+                      {post.title && <p className="font-semibold text-gray-900">{post.title}</p>}
+                      <p className="text-gray-700 truncate max-w-xs text-sm">{post.content}</p>
                     </td>
                     <td className="py-4 text-gray-600">
                       {new Date(post.scheduled_date).toLocaleDateString()}
@@ -543,10 +817,19 @@ const AdminContent: React.FC = () => {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => setShowContentDetails(post)}
+                          onClick={() => openEditModal(post)}
                         >
-                          <Eye className="w-4 h-4" />
+                          <Edit className="w-4 h-4" />
                         </Button>
+                        {post.images && post.images.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadImages(post.id)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -560,13 +843,16 @@ const AdminContent: React.FC = () => {
       {/* Create Content Modal */}
       <Modal
         isOpen={showCreateContent}
-        onClose={() => setShowCreateContent(false)}
+        onClose={() => {
+          setShowCreateContent(false);
+          setImagePreview([]);
+        }}
         title="Create New Content"
         size="lg"
       >
         <form onSubmit={handleCreateContent} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Client *</label>
             <select
               value={newContent.client}
               onChange={(e) => setNewContent({ ...newContent, client: e.target.value })}
@@ -583,7 +869,7 @@ const AdminContent: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Platform *</label>
             <select
               value={newContent.platform}
               onChange={(e) => setNewContent({ ...newContent, platform: e.target.value })}
@@ -593,14 +879,22 @@ const AdminContent: React.FC = () => {
               <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
               <option value="youtube">YouTube</option>
-              <option value="facebook">Facebook</option>
-              <option value="twitter">Twitter</option>
-              <option value="linkedin">LinkedIn</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+            <input
+              type="text"
+              value={newContent.title}
+              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              placeholder="Post title"
+            />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Content *</label>
             <textarea
               value={newContent.content}
               onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
@@ -613,7 +907,7 @@ const AdminContent: React.FC = () => {
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Schedule Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Schedule Date *</label>
               <input
                 type="datetime-local"
                 value={newContent.scheduled_date}
@@ -624,15 +918,52 @@ const AdminContent: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Image URL (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Upload Images</label>
               <input
-                type="url"
-                value={newContent.image_url}
-                onChange={(e) => setNewContent({ ...newContent, image_url: e.target.value })}
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => handleImageChange(e, false)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                placeholder="https://example.com/image.jpg"
               />
             </div>
+          </div>
+
+          {imagePreview.length > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {imagePreview.map((preview, index) => (
+                <img
+                  key={index}
+                  src={preview}
+                  alt={`Preview ${index + 1}`}
+                  className="w-full h-24 object-cover rounded"
+                />
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Message to Client</label>
+            <textarea
+              value={newContent.admin_message}
+              onChange={(e) => setNewContent({ ...newContent, admin_message: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              rows={3}
+              placeholder="Add notes or instructions for the client..."
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="needs_approval"
+              checked={newContent.needs_client_approval}
+              onChange={(e) => setNewContent({ ...newContent, needs_client_approval: e.target.checked })}
+              className="w-4 h-4 text-purple-600"
+            />
+            <label htmlFor="needs_approval" className="ml-2 text-sm text-gray-700">
+              Needs client approval before posting
+            </label>
           </div>
           
           <div className="flex justify-end space-x-3 pt-4">
@@ -640,83 +971,199 @@ const AdminContent: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit">
-              Create & Approve
+              {newContent.needs_client_approval ? 'Create & Send for Approval' : 'Create & Approve'}
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Content Details Modal */}
-      {showContentDetails && (
+      {/* Edit Modal */}
+      {showEditModal && (
         <Modal
-          isOpen={!!showContentDetails}
-          onClose={() => setShowContentDetails(null)}
-          title="Content Details"
+          isOpen={!!showEditModal}
+          onClose={() => {
+            setShowEditModal(null);
+            setImagePreview([]);
+          }}
+          title="Edit Content"
           size="lg"
         >
-          <div className="space-y-6">
+          <form onSubmit={handleEditContent} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+              <input
+                type="text"
+                value={editContent.title}
+                onChange={(e) => setEditContent({ ...editContent, title: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+              <textarea
+                value={editContent.content}
+                onChange={(e) => setEditContent({ ...editContent, content: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                rows={6}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Schedule Date</label>
+              <input
+                type="datetime-local"
+                value={editContent.scheduled_date}
+                onChange={(e) => setEditContent({ ...editContent, scheduled_date: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            {/* Existing Images */}
+            {showEditModal.images && showEditModal.images.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Current Images</label>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {showEditModal.images.map((img) => (
+                    <img
+                      key={img.id}
+                      src={img.image_url}
+                      alt="Current"
+                      className="w-full h-24 object-cover rounded"
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="delete_old"
+                    checked={editContent.delete_old_images}
+                    onChange={(e) => setEditContent({ ...editContent, delete_old_images: e.target.checked })}
+                    className="w-4 h-4 text-purple-600"
+                  />
+                  <label htmlFor="delete_old" className="ml-2 text-sm text-gray-700">
+                    Delete old images when uploading new ones
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Upload New Images</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => handleImageChange(e, true)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            {imagePreview.length > 0 && (
+              <div className="grid grid-cols-4 gap-2">
+                {imagePreview.map((preview, index) => (
+                  <img
+                    key={index}
+                    src={preview}
+                    alt={`New ${index + 1}`}
+                    className="w-full h-24 object-cover rounded"
+                  />
+                ))}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Admin Message</label>
+              <textarea
+                value={editContent.admin_message}
+                onChange={(e) => setEditContent({ ...editContent, admin_message: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowEditModal(null)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Mark as Posted Modal */}
+      {showPostModal && (
+        <Modal
+          isOpen={!!showPostModal}
+          onClose={() => setShowPostModal(null)}
+          title="Mark as Posted"
+          size="md"
+        >
+          <form onSubmit={handleMarkPosted} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Post URL *</label>
+              <input
+                type="url"
+                value={postData.post_url}
+                onChange={(e) => setPostData({ ...postData, post_url: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                placeholder="https://..."
+                required
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-600">Client</label>
-                <p className="text-gray-900">{showContentDetails.client_name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Platform</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{getPlatformIcon(showContentDetails.platform)}</span>
-                  <span className="capitalize">{showContentDetails.platform}</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Status</label>
-                <Badge variant={getStatusColor(showContentDetails.status)}>
-                  {showContentDetails.status.replace('-', ' ')}
-                </Badge>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Scheduled Date</label>
-                <p className="text-gray-900">{new Date(showContentDetails.scheduled_date).toLocaleString()}</p>
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600">Content</label>
-              <p className="text-gray-900 bg-gray-50 p-3 rounded-lg mt-1">{showContentDetails.content}</p>
-            </div>
-            
-            {showContentDetails.image_url && (
-              <div>
-                <label className="text-sm font-medium text-gray-600">Image</label>
-                <img 
-                  src={showContentDetails.image_url} 
-                  alt="Content" 
-                  className="mt-2 max-w-full h-auto rounded-lg"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Likes</label>
+                <input
+                  type="number"
+                  value={postData.likes}
+                  onChange={(e) => setPostData({ ...postData, likes: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-            )}
-            
-            {showContentDetails.engagement_rate && (
               <div>
-                <label className="text-sm font-medium text-gray-600">Engagement Rate</label>
-                <p className="text-gray-900">{(showContentDetails.engagement_rate * 100).toFixed(1)}%</p>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comments</label>
+                <input
+                  type="number"
+                  value={postData.comments}
+                  onChange={(e) => setPostData({ ...postData, comments: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
               </div>
-            )}
-            
-            {showContentDetails.approved_by_name && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Approved By</label>
-                  <p className="text-gray-900">{showContentDetails.approved_by_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Approved At</label>
-                  <p className="text-gray-900">
-                    {showContentDetails.approved_at && new Date(showContentDetails.approved_at).toLocaleString()}
-                  </p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Shares</label>
+                <input
+                  type="number"
+                  value={postData.shares}
+                  onChange={(e) => setPostData({ ...postData, shares: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
               </div>
-            )}
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Views</label>
+                <input
+                  type="number"
+                  value={postData.views}
+                  onChange={(e) => setPostData({ ...postData, views: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => setShowPostModal(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="success">
+                <Upload className="w-4 h-4 mr-2" />
+                Mark as Posted
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

@@ -189,7 +189,7 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
-
+  
   // Content methods - UPDATED with FormData handling and new methods
   async getContent() {
     const response = await this.request('/content/');
@@ -225,24 +225,24 @@ class ApiService {
   }
 
   async updateContent(id: string, contentData: any) {
-    // Support both FormData and regular JSON updates
-    if (contentData instanceof FormData) {
-      const url = `${this.baseURL}/content/${id}/`;
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          ...(this.token && { Authorization: `Token ${this.token}` }),
-        },
-        body: contentData,
-      });
+  // Support both FormData and regular JSON updates
+  if (contentData instanceof FormData) {
+    const url = `${this.baseURL}/content/${id}/`;
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        ...(this.token && { Authorization: `Token ${this.token}` }),
+      },
+      body: contentData,
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
+
+    return await response.json();
+  }
 
     return await this.request(`/content/${id}/`, {
       method: 'PATCH',
