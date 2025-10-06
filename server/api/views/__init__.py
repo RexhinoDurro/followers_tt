@@ -23,7 +23,24 @@ from .message_views import MessageViewSet
 from .notification_views import NotificationViewSet
 from .file_views import FileViewSet
 
-# Profile views are now included in auth_views above
+# ============ BANK SETTINGS VIEWS ============
+try:
+    from .admin.bank_settings_views import (
+        admin_bank_settings,
+        submit_payment_verification,
+        get_pending_verifications,
+        approve_payment_verification
+    )
+    BANK_SETTINGS_AVAILABLE = True
+except ImportError:
+    BANK_SETTINGS_AVAILABLE = False
+    from django.http import JsonResponse
+    def bank_not_available(request, *args, **kwargs):
+        return JsonResponse({'error': 'Bank settings functionality not available'}, status=501)
+    admin_bank_settings = bank_not_available
+    submit_payment_verification = bank_not_available
+    get_pending_verifications = bank_not_available
+    approve_payment_verification = bank_not_available
 
 # ============ MESSAGE VIEWS ============
 try:
@@ -115,8 +132,6 @@ except ImportError:
     get_admin_billing_settings_stub = billing_not_available
     delete_admin_account_stub = billing_not_available
 
-# Client performance report is already imported above in dashboard statistics
-
 # ============ HEALTH CHECK FUNCTION ============
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -167,6 +182,10 @@ __all__ = [
     'pay_invoice_stub', 'get_payment_methods_stub', 'create_setup_intent_stub',
     'set_default_payment_method_stub', 'delete_payment_method_stub',
     'get_admin_billing_settings_stub', 'delete_admin_account_stub',
+    
+    # Bank settings
+    'admin_bank_settings', 'submit_payment_verification',
+    'get_pending_verifications', 'approve_payment_verification',
     
     # Health check
     'health_check',

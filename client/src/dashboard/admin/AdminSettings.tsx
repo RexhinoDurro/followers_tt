@@ -1,4 +1,4 @@
-// client/src/dashboard/admin/AdminSettings.tsx - Redesigned to match ClientSettings
+// client/src/dashboard/admin/AdminSettings.tsx - Complete with Bank Details
 import React, { useState, useEffect } from 'react';
 import {
   User, Lock, Upload, Camera, Save, AlertCircle, CheckCircle,
@@ -24,6 +24,14 @@ interface AdminProfile {
   avatar?: string;
   bio?: string;
   created_at: string;
+}
+
+interface BankSettings {
+  admin_full_name: string;
+  iban: string;
+  bank_name: string;
+  swift_code: string;
+  additional_info: string;
 }
 
 const AdminSettings: React.FC = () => {
@@ -62,6 +70,15 @@ const AdminSettings: React.FC = () => {
   const [profilePhoto, setProfilePhoto] = useState<string | null>(user?.avatar || null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
+  // Bank settings state
+  const [bankSettings, setBankSettings] = useState<BankSettings>({
+    admin_full_name: '',
+    iban: '',
+    bank_name: '',
+    swift_code: '',
+    additional_info: ''
+  });
+
   // Notifications state
   const [notifications, setNotifications] = useState({
     email_invoices: true,
@@ -76,6 +93,7 @@ const AdminSettings: React.FC = () => {
 
   useEffect(() => {
     fetchAdminData();
+    fetchBankSettings();
   }, []);
 
   const fetchAdminData = async () => {
@@ -98,6 +116,40 @@ const AdminSettings: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to fetch admin data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBankSettings = async () => {
+    try {
+      const data = await ApiService.getAdminBankSettings();
+      if (data.configured) {
+        setBankSettings({
+          admin_full_name: data.admin_full_name || '',
+          iban: data.iban || '',
+          bank_name: data.bank_name || '',
+          swift_code: data.swift_code || '',
+          additional_info: data.additional_info || ''
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch bank settings:', error);
+    }
+  };
+
+  const handleBankSettingsUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await ApiService.updateAdminBankSettings(bankSettings);
+      setSuccess('Bank account details updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update bank settings');
     } finally {
       setLoading(false);
     }
@@ -546,6 +598,107 @@ const AdminSettings: React.FC = () => {
                 {loading ? 'Changing...' : 'Change Password'}
               </button>
             </div>
+          </div>
+        </form>
+      </div>
+
+      {/* Bank Account Settings */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+          <DollarSign className="w-5 h-5 mr-2 text-purple-600" />
+          Bank Account Details
+        </h2>
+        
+        <p className="text-gray-600 mb-6">
+          Enter your bank account details for clients to make direct bank transfers
+        </p>
+
+        <form onSubmit={handleBankSettingsUpdate} className="space-y-5 max-w-2xl">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Account Holder Full Name *
+            </label>
+            <input
+              type="text"
+              value={bankSettings.admin_full_name}
+              onChange={(e) => setBankSettings({...bankSettings, admin_full_name: e.target.value})}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              placeholder="Enter your full name as it appears on bank account"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              IBAN *
+            </label>
+            <input
+              type="text"
+              value={bankSettings.iban}
+              onChange={(e) => setBankSettings({...bankSettings, iban: e.target.value.toUpperCase()})}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all font-mono"
+              placeholder="AL35 2021 1109 0000 0001 2345 6789"
+              maxLength={34}
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Format: AL followed by 28 digits (34 characters total)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bank Name (Optional)
+            </label>
+            <input
+              type="text"
+              value={bankSettings.bank_name}
+              onChange={(e) => setBankSettings({...bankSettings, bank_name: e.target.value})}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              placeholder="e.g., Raiffeisen Bank Albania"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              SWIFT/BIC Code (Optional)
+            </label>
+            <input
+              type="text"
+              value={bankSettings.swift_code}
+              onChange={(e) => setBankSettings({...bankSettings, swift_code: e.target.value.toUpperCase()})}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all font-mono"
+              placeholder="e.g., UNCRALTX"
+              maxLength={11}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Additional Payment Instructions (Optional)
+            </label>
+            <textarea
+              value={bankSettings.additional_info}
+              onChange={(e) => setBankSettings({...bankSettings, additional_info: e.target.value})}
+              rows={3}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
+              placeholder="Any additional instructions for clients making transfers..."
+              maxLength={500}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {(bankSettings.additional_info || '').length}/500 characters
+            </p>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {loading ? 'Saving...' : 'Save Bank Details'}
+            </button>
           </div>
         </form>
       </div>

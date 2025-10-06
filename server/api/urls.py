@@ -24,6 +24,14 @@ from .views import (
     health_check
 )
 
+from .views.admin.bank_settings_views import (
+    admin_bank_settings,
+    submit_payment_verification,
+    get_pending_verifications,
+    approve_payment_verification
+)
+
+
 from .views.auth_views import (
     RegisterView, LoginView, logout_view, current_user_view,
     update_profile, change_password,
@@ -214,6 +222,12 @@ urlpatterns = [
     
     # Health check
     path('health/', health_check, name='health_check'),
+    
+        # Bank Settings and Payment Verification
+    path('admin/bank-settings/', admin_bank_settings, name='admin_bank_settings'),
+    path('billing/submit-verification/', submit_payment_verification, name='submit_verification'),
+    path('admin/pending-verifications/', get_pending_verifications, name='pending_verifications'),
+    path('admin/approve-verification/<uuid:verification_id>/', approve_payment_verification, name='approve_verification'),
     
     # Message endpoints
     path('messages/send-to-admin/', send_message_to_admin, name='send_message_to_admin'),

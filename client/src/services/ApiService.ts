@@ -513,6 +513,7 @@ class ApiService {
     return await this.request('/health/');
   }
 
+  
   // ============ PAYPAL BILLING METHODS (replacing Stripe methods) ============
   
   // Get available subscription plans

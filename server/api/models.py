@@ -420,6 +420,51 @@ class Invoice(models.Model):
     class Meta:
         ordering = ['-created_at']
 
+class AdminBankSettings(models.Model):
+    """Admin bank account settings for receiving payments"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    admin_full_name = models.CharField(max_length=255, help_text="Full name for bank transfer")
+    iban = models.CharField(max_length=34, help_text="IBAN number for receiving payments")
+    bank_name = models.CharField(max_length=255, blank=True, help_text="Bank name (optional)")
+    swift_code = models.CharField(max_length=11, blank=True, help_text="SWIFT/BIC code (optional)")
+    additional_info = models.TextField(blank=True, help_text="Additional payment instructions")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Admin Bank Settings"
+        verbose_name_plural = "Admin Bank Settings"
+    
+    def __str__(self):
+        return f"Bank Settings - {self.admin_full_name}"
+
+
+class PaymentVerification(models.Model):
+    """Track client payment verifications"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending Verification'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='payment_verifications')
+    plan = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    client_full_name = models.CharField(max_length=255, help_text="Client's full name for verification")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    submitted_at = models.DateTimeField(default=timezone.now)
+    approved_at = models.DateTimeField(blank=True, null=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='approved_verifications')
+    notes = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-submitted_at']
+    
+    def __str__(self):
+        return f"Payment Verification - {self.client.name} - {self.status}"
+    
 class TeamMember(models.Model):
     """Team members working on client accounts"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
