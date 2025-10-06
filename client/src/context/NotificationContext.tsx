@@ -19,6 +19,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [loading, setLoading] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
+    // Only fetch if we have an auth token
+    const token = ApiService.getToken();
+    if (!token) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const data = await ApiService.getNotifications();
@@ -43,9 +51,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   useEffect(() => {
+    // Check if user has a token before fetching
+    const token = ApiService.getToken();
+    if (!token) {
+      return; // Don't fetch or set up polling if not authenticated
+    }
+
     fetchNotifications();
     
-    // Poll for new notifications every 30 seconds
+    // Poll for new notifications every 30 seconds (only if authenticated)
     const interval = setInterval(fetchNotifications, 30000);
     
     return () => clearInterval(interval);
