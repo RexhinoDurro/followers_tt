@@ -263,6 +263,21 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'api.tasks.generate_weekly_reports',
         'schedule': crontab(minute=0, hour=9, day_of_week=1),
     },
+    # Sync all YouTube accounts every 6 hours
+    'sync-youtube-accounts': {
+        'task': 'api.tasks.sync_all_youtube_accounts',
+        'schedule': crontab(minute=0, hour='*/6'),  # Every 6 hours
+    },
+    # Sync all Instagram accounts every 4 hours
+    'sync-instagram-accounts': {
+        'task': 'api.tasks.sync_all_instagram_accounts',
+        'schedule': crontab(minute=0, hour='*/4'),  # Every 4 hours
+    },
+    # Aggregate monthly performance daily at 2 AM
+    'aggregate-monthly-performance': {
+        'task': 'api.tasks.aggregate_monthly_performance',
+        'schedule': crontab(minute=0, hour=2),  # Daily at 2 AM
+    },
 }
 
 # ============ CACHE TIMEOUTS ============
@@ -390,6 +405,7 @@ LOGGING = {
         },
     },
 }
+
 
 # Create logs directory if it doesn't exist
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)

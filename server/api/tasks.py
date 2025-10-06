@@ -1,334 +1,203 @@
-# server/api/tasks.py
-from celery import shared_task
-from celery.utils.log import get_task_logger
-from django.utils import timezone
-from datetime import timedelta
-from django.db import transaction
-from .models import SocialMediaAccount, Client, RealTimeMetrics, PerformanceData, PostMetrics
-from .services.instagram_service import InstagramService
-from .services.youtube_service import YouTubeService
+# server/api/tasks.py - ADD OR UPDATE THIS FILE
+"""
+Celery tasks for background processing
+Handles YouTube sync, metrics aggregation, and scheduled tasks
+"""
 
-logger = get_task_logger(__name__)
+from celery import shared_task
+from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @shared_task(bind=True, max_retries=3)
-def sync_all_client_data(self):
-    """Sync data for all active social media accounts"""
+def sync_youtube_data(self, account_id):
+    """
+    Sync YouTube channel data and videos
+    Runs after OAuth connection and on schedule
+    """
     try:
-        accounts = SocialMediaAccount.objects.filter(is_active=True)
-        total_accounts = accounts.count()
+        from .models import SocialMediaAccount
+        from .services.youtube_service import YouTubeService
+        from .services.metrics_aggregation_service import MetricsAggregationService
         
-        logger.info(f"Starting sync for {total_accounts} active social media accounts")
+        account = SocialMediaAccount.objects.get(id=account_id, platform='youtube')
         
-        success_count = 0
-        error_count = 0
+        logger.info(f"Starting YouTube sync for account: {account.username}")
         
-        for account in accounts:
-            try:
-                if account.platform == 'instagram':
-                    sync_instagram_data.delay(str(account.id))
-                elif account.platform == 'youtube':
-                    sync_youtube_data.delay(str(account.id))
-                # Add more platforms here as needed
-                
-                success_count += 1
-                
-            except Exception as e:
-                error_count += 1
-                logger.error(f"Failed to queue sync for account {account.id}: {str(e)}")
+        # Initialize service
+        service = YouTubeService(account)
         
-        logger.info(f"Sync queued: {success_count} successful, {error_count} errors")
+        # Sync channel metrics (subscribers, views, etc.)
+        logger.info(f"Syncing channel metrics for {account.username}")
+        service.sync_channel_metrics()
+        
+        # Sync recent videos
+        logger.info(f"Syncing recent videos for {account.username}")
+        service.sync_recent_videos(limit=25)
+        
+        # Sync videos to content posts
+        logger.info(f"Syncing videos to content posts for {account.username}")
+        MetricsAggregationService.sync_youtube_videos_to_content(account)
+        
+        # Update last sync time
+        account.last_sync = timezone.now()
+        account.save()
+        
+        logger.info(f"✓ YouTube sync completed successfully for {account.username}")
         
         return {
-            'total_accounts': total_accounts,
-            'success_count': success_count,
-            'error_count': error_count
+            'success': True,
+            'account_id': str(account_id),
+            'username': account.username,
+            'synced_at': timezone.now().isoformat()
         }
         
-    except Exception as exc:
-        logger.error(f"Failed to sync all client data: {str(exc)}")
-        raise self.retry(exc=exc, countdown=300)  # Retry in 5 minutes
+    except SocialMediaAccount.DoesNotExist:
+        logger.error(f"Account {account_id} not found")
+        return {'success': False, 'error': 'Account not found'}
+        
+    except Exception as e:
+        logger.error(f"YouTube sync failed for {account_id}: {str(e)}", exc_info=True)
+        
+        # Retry with exponential backoff
+        raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+
 
 @shared_task(bind=True, max_retries=3)
 def sync_instagram_data(self, account_id):
     """Sync Instagram account data"""
     try:
+        from .models import SocialMediaAccount
+        from .services.instagram_service import InstagramService
+        from .services.metrics_aggregation_service import MetricsAggregationService
+        
         account = SocialMediaAccount.objects.get(id=account_id, platform='instagram')
         
-        if not account.is_active:
-            logger.info(f"Skipping inactive Instagram account: {account.username}")
-            return {'status': 'skipped', 'reason': 'inactive'}
-        
-        logger.info(f"Starting Instagram sync for: {account.username}")
+        logger.info(f"Starting Instagram sync for account: {account.username}")
         
         service = InstagramService(account)
         
         # Sync profile metrics
-        profile_metrics = service.sync_profile_metrics()
+        service.sync_profile_metrics()
         
         # Sync recent posts
-        service.sync_recent_posts()
+        service.sync_recent_posts(limit=25)
         
-        # Update client performance data
-        update_client_monthly_performance.delay(str(account.client.id))
+        # Update last sync
+        account.last_sync = timezone.now()
+        account.save()
         
-        logger.info(f"Successfully completed Instagram sync for: {account.username}")
+        logger.info(f"✓ Instagram sync completed for {account.username}")
         
-        return {
-            'status': 'success',
-            'account_id': account_id,
-            'username': account.username,
-            'followers': profile_metrics.followers_count if profile_metrics else 0
-        }
+        return {'success': True, 'account_id': str(account_id)}
         
-    except SocialMediaAccount.DoesNotExist:
-        error_msg = f"Instagram account not found: {account_id}"
-        logger.error(error_msg)
-        return {'status': 'error', 'message': error_msg}
-        
-    except Exception as exc:
-        logger.error(f"Failed to sync Instagram data for account {account_id}: {str(exc)}")
-        
-        # Mark account as having sync issues after max retries
-        if self.request.retries >= self.max_retries:
-            try:
-                account = SocialMediaAccount.objects.get(id=account_id)
-                # Don't deactivate, but log the persistent error
-                logger.error(f"Max retries reached for Instagram account {account.username}")
-            except:
-                pass
-        
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
+    except Exception as e:
+        logger.error(f"Instagram sync failed: {str(e)}")
+        raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
 
-@shared_task(bind=True, max_retries=3)
-def sync_youtube_data(self, account_id):
-    """Sync YouTube channel data"""
-    try:
-        account = SocialMediaAccount.objects.get(id=account_id, platform='youtube')
-        
-        if not account.is_active:
-            logger.info(f"Skipping inactive YouTube account: {account.username}")
-            return {'status': 'skipped', 'reason': 'inactive'}
-        
-        logger.info(f"Starting YouTube sync for: {account.username}")
-        
-        service = YouTubeService(account)
-        
-        # Sync channel metrics
-        channel_metrics = service.sync_channel_metrics()
-        
-        # Sync recent videos
-        service.sync_recent_videos()
-        
-        # Update client performance data
-        update_client_monthly_performance.delay(str(account.client.id))
-        
-        logger.info(f"Successfully completed YouTube sync for: {account.username}")
-        
-        return {
-            'status': 'success',
-            'account_id': account_id,
-            'username': account.username,
-            'subscribers': channel_metrics.followers_count if channel_metrics else 0
-        }
-        
-    except SocialMediaAccount.DoesNotExist:
-        error_msg = f"YouTube account not found: {account_id}"
-        logger.error(error_msg)
-        return {'status': 'error', 'message': error_msg}
-        
-    except Exception as exc:
-        logger.error(f"Failed to sync YouTube data for account {account_id}: {str(exc)}")
-        
-        # Mark account as having sync issues after max retries
-        if self.request.retries >= self.max_retries:
-            try:
-                account = SocialMediaAccount.objects.get(id=account_id)
-                logger.error(f"Max retries reached for YouTube account {account.username}")
-            except:
-                pass
-        
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
-
-@shared_task(bind=True, max_retries=2)
-def update_client_monthly_performance(self, client_id):
-    """Update monthly performance data for a client"""
-    try:
-        client = Client.objects.get(id=client_id)
-        current_month = timezone.now().replace(day=1).date()
-        
-        logger.info(f"Updating monthly performance for client: {client.name}")
-        
-        # Get latest metrics from all client's social accounts
-        latest_metrics = RealTimeMetrics.objects.filter(
-            account__client=client,
-            date__gte=current_month
-        ).order_by('account', '-date')
-        
-        # Calculate aggregated metrics
-        total_followers = 0
-        total_reach = 0
-        total_impressions = 0
-        total_engagement = 0
-        account_count = 0
-        
-        # Get unique accounts and their latest metrics
-        processed_accounts = set()
-        
-        for metric in latest_metrics:
-            if metric.account_id not in processed_accounts:
-                total_followers += metric.followers_count
-                total_reach += metric.reach
-                total_impressions += metric.impressions
-                total_engagement += float(metric.engagement_rate)
-                account_count += 1
-                processed_accounts.add(metric.account_id)
-        
-        # Calculate average engagement rate
-        avg_engagement = total_engagement / account_count if account_count > 0 else 0
-        
-        # Calculate growth rate
-        previous_month = (current_month.replace(day=1) - timedelta(days=1)).replace(day=1)
-        previous_performance = PerformanceData.objects.filter(
-            client=client,
-            month=previous_month
-        ).first()
-        
-        growth_rate = 0
-        if previous_performance and previous_performance.followers > 0:
-            growth_rate = ((total_followers - previous_performance.followers) / previous_performance.followers) * 100
-        
-        # Update or create performance record
-        with transaction.atomic():
-            performance, created = PerformanceData.objects.update_or_create(
-                client=client,
-                month=current_month,
-                defaults={
-                    'followers': total_followers,
-                    'engagement': avg_engagement,
-                    'reach': total_reach,
-                    'impressions': total_impressions,
-                    'growth_rate': growth_rate,
-                }
-            )
-        
-        logger.info(f"Updated monthly performance for {client.name}: {total_followers} followers, {avg_engagement:.2f}% engagement")
-        
-        return {
-            'status': 'success',
-            'client_id': client_id,
-            'client_name': client.name,
-            'total_followers': total_followers,
-            'engagement_rate': avg_engagement,
-            'growth_rate': growth_rate,
-            'created': created
-        }
-        
-    except Client.DoesNotExist:
-        error_msg = f"Client not found: {client_id}"
-        logger.error(error_msg)
-        return {'status': 'error', 'message': error_msg}
-        
-    except Exception as exc:
-        logger.error(f"Failed to update monthly performance for client {client_id}: {str(exc)}")
-        raise self.retry(exc=exc, countdown=120)
 
 @shared_task
-def cleanup_old_metrics():
-    """Clean up old metrics data to prevent database bloat"""
+def aggregate_monthly_performance():
+    """
+    Aggregate daily metrics into monthly performance data
+    Run this at the end of each month or daily to keep data fresh
+    """
     try:
-        # Keep metrics for last 12 months
-        cutoff_date = timezone.now() - timedelta(days=365)
+        from .models import Client
+        from .services.metrics_aggregation_service import MetricsAggregationService
         
-        deleted_realtime = RealTimeMetrics.objects.filter(
-            created_at__lt=cutoff_date
-        ).delete()[0]
+        logger.info("Starting monthly performance aggregation for all clients")
         
-        deleted_posts = PostMetrics.objects.filter(
-            posted_at__lt=cutoff_date
-        ).delete()[0]
+        results = MetricsAggregationService.aggregate_all_clients_current_month()
         
-        logger.info(f"Cleaned up old metrics: {deleted_realtime} realtime metrics, {deleted_posts} post metrics")
+        logger.info(f"✓ Aggregated performance data for {len(results)} clients")
         
         return {
-            'status': 'success',
-            'deleted_realtime_metrics': deleted_realtime,
-            'deleted_post_metrics': deleted_posts
+            'success': True,
+            'clients_processed': len(results),
+            'timestamp': timezone.now().isoformat()
         }
         
     except Exception as e:
-        logger.error(f"Failed to cleanup old metrics: {str(e)}")
-        raise
+        logger.error(f"Monthly aggregation failed: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
 
 @shared_task
-def generate_weekly_reports():
-    """Generate weekly performance reports for all active clients"""
+def sync_all_youtube_accounts():
+    """
+    Sync all active YouTube accounts
+    Run this on a schedule (e.g., every 6 hours)
+    """
     try:
-        active_clients = Client.objects.filter(status='active')
-        reports_generated = 0
+        from .models import SocialMediaAccount
         
-        for client in active_clients:
+        youtube_accounts = SocialMediaAccount.objects.filter(
+            platform='youtube',
+            is_active=True
+        )
+        
+        logger.info(f"Syncing {youtube_accounts.count()} YouTube accounts")
+        
+        results = []
+        for account in youtube_accounts:
             try:
-                # Generate report data
-                end_date = timezone.now().date()
-                start_date = end_date - timedelta(days=7)
-                
-                # Get metrics for the week
-                weekly_metrics = RealTimeMetrics.objects.filter(
-                    account__client=client,
-                    date__gte=start_date,
-                    date__lte=end_date
-                )
-                
-                if weekly_metrics.exists():
-                    # Calculate weekly summary
-                    total_followers_gained = sum(
-                        metric.daily_growth for metric in weekly_metrics
-                    )
-                    
-                    avg_engagement = sum(
-                        float(metric.engagement_rate) for metric in weekly_metrics
-                    ) / weekly_metrics.count()
-                    
-                    total_reach = sum(metric.reach for metric in weekly_metrics)
-                    
-                    # Here you could send email reports, create notifications, etc.
-                    logger.info(f"Generated weekly report for {client.name}: "
-                              f"{total_followers_gained} followers gained, "
-                              f"{avg_engagement:.2f}% avg engagement")
-                    
-                    reports_generated += 1
-                    
+                task = sync_youtube_data.delay(str(account.id))
+                results.append({
+                    'account_id': str(account.id),
+                    'username': account.username,
+                    'task_id': task.id
+                })
             except Exception as e:
-                logger.error(f"Failed to generate report for client {client.name}: {str(e)}")
-                continue
+                logger.error(f"Failed to queue sync for {account.username}: {e}")
         
-        logger.info(f"Generated {reports_generated} weekly reports")
+        logger.info(f"✓ Queued {len(results)} YouTube sync tasks")
         
         return {
-            'status': 'success',
-            'reports_generated': reports_generated
+            'success': True,
+            'accounts_queued': len(results),
+            'results': results
         }
         
     except Exception as e:
-        logger.error(f"Failed to generate weekly reports: {str(e)}")
-        raise
+        logger.error(f"Batch YouTube sync failed: {str(e)}")
+        return {'success': False, 'error': str(e)}
 
-# Periodic task configuration (add to settings.py)
-"""
-from celery.schedules import crontab
 
-CELERY_BEAT_SCHEDULE = {
-    'sync-all-data': {
-        'task': 'api.tasks.sync_all_client_data',
-        'schedule': crontab(minute=0, hour='*/4'),  # Every 4 hours
-    },
-    'cleanup-old-metrics': {
-        'task': 'api.tasks.cleanup_old_metrics',
-        'schedule': crontab(minute=0, hour=2, day_of_week=0),  # Weekly on Sunday at 2 AM
-    },
-    'generate-weekly-reports': {
-        'task': 'api.tasks.generate_weekly_reports',
-        'schedule': crontab(minute=0, hour=9, day_of_week=1),  # Monday at 9 AM
-    },
-}
-"""
+@shared_task
+def sync_all_instagram_accounts():
+    """Sync all active Instagram accounts"""
+    try:
+        from .models import SocialMediaAccount
+        
+        instagram_accounts = SocialMediaAccount.objects.filter(
+            platform='instagram',
+            is_active=True
+        )
+        
+        logger.info(f"Syncing {instagram_accounts.count()} Instagram accounts")
+        
+        results = []
+        for account in instagram_accounts:
+            try:
+                task = sync_instagram_data.delay(str(account.id))
+                results.append({
+                    'account_id': str(account.id),
+                    'task_id': task.id
+                })
+            except Exception as e:
+                logger.error(f"Failed to queue Instagram sync: {e}")
+        
+        return {
+            'success': True,
+            'accounts_queued': len(results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Batch Instagram sync failed: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
+# ============ PERIODIC TASK SCHEDULE ============

@@ -90,7 +90,7 @@ def dashboard_stats_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def client_dashboard_stats_view(request):
-    """Get dashboard statistics for client users"""
+    """Get dashboard statistics for client users - UPDATED FOR REAL-TIME DATA"""
     if request.user.role != 'client':
         return Response({'error': 'Client access required'}, status=status.HTTP_403_FORBIDDEN)
     
@@ -99,43 +99,20 @@ def client_dashboard_stats_view(request):
     except Client.DoesNotExist:
         return Response({'error': 'Client profile not found'}, status=status.HTTP_404_NOT_FOUND)
     
-    # Get latest performance data
-    latest_performance = PerformanceData.objects.filter(
-        client=client
-    ).order_by('-month').first()
+    # Import the aggregation service
+    from ...services.metrics_aggregation_service import MetricsAggregationService
     
-    # Posts this month
-    current_month = timezone.now().replace(day=1)
-    posts_this_month = ContentPost.objects.filter(
-        client=client,
-        created_at__gte=current_month
-    ).count()
+    # Get REAL-TIME stats (not monthly aggregation)
+    stats = MetricsAggregationService.get_client_real_time_stats(client)
     
-    # Growth rate calculation
-    performance_data = PerformanceData.objects.filter(
-        client=client
-    ).order_by('-month')[:2]
+    # Add payment info
+    stats['next_payment_amount'] = float(client.monthly_fee)
+    stats['next_payment_date'] = client.next_payment
     
-    growth_rate = 0
-    if len(performance_data) >= 2:
-        current = performance_data[0]
-        previous = performance_data[1]
-        if previous.followers > 0:
-            growth_rate = ((current.followers - previous.followers) / previous.followers) * 100
+    logger.info(f"Client dashboard stats for {client.name}: {stats}")
     
-    stats_data = {
-        'total_followers': latest_performance.followers if latest_performance else 0,
-        'engagement_rate': latest_performance.engagement if latest_performance else 0,
-        'posts_this_month': posts_this_month,
-        'reach': latest_performance.reach if latest_performance else 0,
-        'growth_rate': growth_rate,
-        'next_payment_amount': client.monthly_fee,
-        'next_payment_date': client.next_payment
-    }
-    
-    serializer = ClientDashboardStatsSerializer(stats_data)
+    serializer = ClientDashboardStatsSerializer(stats)
     return Response(serializer.data)
-
 
 # Analytics and Reporting Views
 @api_view(['GET'])

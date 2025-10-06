@@ -83,11 +83,11 @@ const ClientPerformance: React.FC = () => {
 
       setClientStats(statsData as ClientStats);
       
-      // Handle different response formats
+      // FIX: Handle the response format correctly
       let metricsArray: RealTimeMetric[] = [];
       if (Array.isArray(metricsData)) {
         metricsArray = metricsData;
-      } else if (metricsData && typeof metricsData === 'object' && 'data' in metricsData && Array.isArray((metricsData as any).data)) {
+      } else if (metricsData && typeof metricsData === 'object' && 'data' in metricsData) {
         metricsArray = (metricsData as { data: RealTimeMetric[] }).data;
       }
       setRealTimeMetrics(metricsArray);
@@ -174,6 +174,33 @@ const ClientPerformance: React.FC = () => {
     }
   };
 
+  const handleManualRefresh = async () => {
+    try {
+      setLoading(true);
+      
+      // Trigger backend sync
+      await fetch(`${ApiService.getBaseURL()}/sync/manual/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${ApiService.getToken()}`
+        }
+      });
+      
+      // Wait 2 seconds for sync to start
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Refresh data
+      await fetchData();
+      
+      alert('✓ Data refreshed! YouTube stats updated.');
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      alert('Failed to refresh data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -196,9 +223,9 @@ const ClientPerformance: React.FC = () => {
           <p className="text-gray-600 mt-1">Track your social media growth and engagement</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={fetchData}>
+          <Button variant="outline" onClick={handleManualRefresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            Refresh YouTube Data
           </Button>
           <Button onClick={downloadReport}>
             <Download className="w-4 h-4 mr-2" />
