@@ -1,9 +1,10 @@
-// client/src/dashboard/admin/AdminContent.tsx - COMPLETE with ALL Features
+// client/src/dashboard/admin/AdminContent.tsx - COMPLETE with DELETE Features
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Calendar, Clock, Eye, Heart, MessageCircle,
   Share2, TrendingUp, Edit, CheckCircle, XCircle, Search,
-  BarChart3, Download, Upload, ExternalLink
+  BarChart3, Download, Upload, ExternalLink,
+  Trash2, AlertTriangle
   } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
@@ -52,6 +53,8 @@ const AdminContent: React.FC = () => {
   const [showCreateContent, setShowCreateContent] = useState(false);
   const [showEditModal, setShowEditModal] = useState<ContentPost | null>(null);
   const [showPostModal, setShowPostModal] = useState<ContentPost | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<ContentPost | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
 
   const [newContent, setNewContent] = useState({
@@ -193,6 +196,35 @@ const AdminContent: React.FC = () => {
     } catch (error) {
       console.error('Failed to mark as posted:', error);
       alert('Failed to mark as posted');
+    }
+  };
+
+  const handleDeleteContent = async () => {
+    if (!showDeleteConfirm) return;
+
+    try {
+      await ApiService.deleteContent(showDeleteConfirm.id);
+      await fetchData();
+      setShowDeleteConfirm(null);
+    } catch (error) {
+      console.error('Failed to delete content:', error);
+      alert('Failed to delete content');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedContent.length === 0) return;
+
+    try {
+      await ApiService.bulkDeleteContent({
+        content_ids: selectedContent.map(c => c.id)
+      });
+      setSelectedContent([]);
+      setShowBulkDeleteConfirm(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to delete content:', error);
+      alert('Failed to delete content');
     }
   };
 
@@ -406,6 +438,14 @@ const AdminContent: React.FC = () => {
               >
                 <XCircle className="w-4 h-4 mr-1" />
                 Reject ({selectedContent.length})
+              </Button>
+              <Button 
+                variant="danger" 
+                size="sm"
+                onClick={() => setShowBulkDeleteConfirm(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Delete ({selectedContent.length})
               </Button>
             </div>
           )}
@@ -693,6 +733,15 @@ const AdminContent: React.FC = () => {
                     </Button>
                   </a>
                 )}
+                
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => setShowDeleteConfirm(post)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
+                </Button>
               </div>
               
               {post.status === 'posted' && (
@@ -830,6 +879,13 @@ const AdminContent: React.FC = () => {
                             <Download className="w-4 h-4" />
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => setShowDeleteConfirm(post)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -1164,6 +1220,99 @@ const AdminContent: React.FC = () => {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <Modal
+          isOpen={!!showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(null)}
+          title="Delete Content Post"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1" />
+              <div>
+                <p className="text-gray-900 font-semibold">Are you sure you want to delete this post?</p>
+                <p className="text-gray-600 mt-1">
+                  This will permanently delete <strong>{showDeleteConfirm.title || 'this content'}</strong> and all associated images.
+                </p>
+                <p className="text-gray-500 text-sm mt-2">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="text-sm text-gray-600">
+                <strong>Client:</strong> {showDeleteConfirm.client_name}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Platform:</strong> {showDeleteConfirm.platform}
+              </p>
+              {showDeleteConfirm.images && showDeleteConfirm.images.length > 0 && (
+                <p className="text-sm text-gray-600">
+                  <strong>Images:</strong> {showDeleteConfirm.images.length} file(s) will be deleted
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteContent}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Post
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <Modal
+          isOpen={showBulkDeleteConfirm}
+          onClose={() => setShowBulkDeleteConfirm(false)}
+          title="Delete Multiple Posts"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-1" />
+              <div>
+                <p className="text-gray-900 font-semibold">
+                  Are you sure you want to delete {selectedContent.length} post(s)?
+                </p>
+                <p className="text-gray-600 mt-1">
+                  This will permanently delete all selected posts and their associated images.
+                </p>
+                <p className="text-gray-500 text-sm mt-2">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded max-h-40 overflow-y-auto">
+              <p className="text-sm font-semibold text-gray-700 mb-2">Posts to be deleted:</p>
+              <ul className="space-y-1">
+                {selectedContent.map(post => (
+                  <li key={post.id} className="text-sm text-gray-600">
+                    • {post.title || post.content.substring(0, 50)} ({post.client_name})
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleBulkDelete}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete {selectedContent.length} Post(s)
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

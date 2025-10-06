@@ -256,6 +256,12 @@ class ApiService {
     });
   }
 
+  async bulkDeleteContent(data: { content_ids: string[] }) {
+  return await this.request('/content/bulk_delete/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
   async approveContent(id: string) {
     return await this.request(`/content/${id}/approve/`, {
       method: 'POST',

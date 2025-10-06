@@ -489,3 +489,59 @@ class ContentPostViewSet(ModelViewSet):
             message = f'{content_posts.count()} posts rejected'
         
         return Response({'message': message, 'count': content_posts.count()})
+    
+    @action(detail=False, methods=['post'])
+    def bulk_delete(self, request):
+        """Bulk delete content posts"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        content_ids = request.data.get('content_ids', [])
+        
+        if not content_ids:
+            return Response(
+                {'error': 'Content IDs are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        content_posts = ContentPost.objects.filter(id__in=content_ids)
+        count = content_posts.count()
+        
+        # Delete associated images first
+        for post in content_posts:
+            for img in post.images.all():
+                if img.image:
+                    try:
+                        img.image.delete(save=False)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete image file: {e}")
+        
+        content_posts.delete()
+        
+        logger.info(f"Admin {request.user.email} deleted {count} content posts")
+        
+        return Response({
+            'message': f'{count} posts deleted successfully',
+            'count': count
+        })
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Delete associated images
+        for img in instance.images.all():
+            if img.image:
+                try:
+                    img.image.delete(save=False)
+                except Exception as e:
+                    logger.warning(f"Failed to delete image file: {e}")
+        
+        post_title = instance.title or instance.id
+        self.perform_destroy(instance)
+        
+        logger.info(f"Admin {request.user.email} deleted content post: {post_title}")
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
