@@ -298,6 +298,19 @@ class ApiService {
     });
   }
 
+  async bulkMarkContentPosted(data: { content_ids: string[] }) {
+    return await this.request('/content/bulk_mark_posted/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async setContentDraft(id: string) {
+    return await this.request(`/content/${id}/set_draft/`, {
+      method: 'POST',
+    });
+  }
+
   async getContentByPlatform(platform: 'instagram' | 'youtube' | 'tiktok') {
     return await this.request(`/content/by_platform/?platform=${platform}`);
   }

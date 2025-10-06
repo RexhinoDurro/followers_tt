@@ -456,6 +456,47 @@ class ContentPostViewSet(ModelViewSet):
         
         return Response(dict(calendar_data))
     
+    @action(detail=True, methods=['post'])
+    def set_draft(self, request, pk=None):
+        """Set content back to draft"""
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        
+        content = self.get_object()
+        content.status = 'draft'
+        content.approved_by = None
+        content.approved_at = None
+        content.save()
+        
+        serializer = self.get_serializer(content)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def bulk_mark_posted(self, request):
+            """Bulk mark content as posted"""
+            if request.user.role != 'admin':
+                return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+            
+            content_ids = request.data.get('content_ids', [])
+            
+            if not content_ids:
+                return Response(
+                    {'error': 'Content IDs are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update all posts to posted status
+            content_posts = ContentPost.objects.filter(id__in=content_ids)
+            content_posts.update(
+                status='posted',
+                posted_at=timezone.now()
+            )
+            
+            return Response({
+                'message': f'{content_posts.count()} posts marked as posted',
+                'count': content_posts.count()
+            })
+            
     @action(detail=False, methods=['post'])
     def bulk_approve(self, request):
         """Bulk approve content"""

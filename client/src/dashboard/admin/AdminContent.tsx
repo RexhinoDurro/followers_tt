@@ -1,13 +1,15 @@
 // client/src/dashboard/admin/AdminContent.tsx - COMPLETE with DELETE Features
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Plus, Calendar, Clock, Eye, Heart, MessageCircle,
+  FileText, Plus, Calendar, Clock, Heart,
   Share2, TrendingUp, Edit, CheckCircle, XCircle, Search,
   BarChart3, Download, Upload, ExternalLink,
-  Trash2, AlertTriangle
+  Trash2, AlertTriangle, Image as ImageIcon
   } from 'lucide-react';
 import { Card, Button, Modal, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
+import { ImageGallery } from '../../components/ImageGallery';
+import { DropdownMenu } from '../../components/DropdownMenu';
 
 interface ContentPost {
   id: string;
@@ -56,6 +58,7 @@ const AdminContent: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<ContentPost | null>(null);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'calendar'>('grid');
+  const [showImageGallery, setShowImageGallery] = useState<{images: any[], index: number} | null>(null);
 
   const [newContent, setNewContent] = useState({
     client: '',
@@ -348,6 +351,23 @@ const AdminContent: React.FC = () => {
     }
   };
 
+  // Bulk Mark Posted handler
+  const handleBulkMarkPosted = async () => {
+    if (selectedContent.length === 0) return;
+    try {
+      // You may want to prompt for post URLs and stats, but here we just mark as posted with empty/default data
+      await ApiService.bulkMarkContentPosted({
+        content_ids: selectedContent.map(c => c.id),
+        // Optionally, you can add more fields if your API expects them
+      });
+      setSelectedContent([]);
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to bulk mark as posted:', error);
+      alert('Failed to bulk mark as posted');
+    }
+  };
+
   const toggleContentSelection = (content: ContentPost) => {
     setSelectedContent(prev => 
       prev.find(c => c.id === content.id)
@@ -412,8 +432,18 @@ const AdminContent: React.FC = () => {
     );
   }
 
+  async function handleSetDraft(id: string) {
+    try {
+      await ApiService.setContentDraft(id);
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to set content to draft:', error);
+      alert('Failed to set content to draft');
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -421,29 +451,22 @@ const AdminContent: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage and approve client content across all platforms</p>
         </div>
         <div className="flex gap-3">
+          {/* Bulk Actions */}
           {selectedContent.length > 0 && (
             <div className="flex gap-2">
-              <Button 
-                variant="success" 
-                size="sm"
-                onClick={() => handleBulkAction('approve')}
-              >
+              <Button variant="success" size="sm" onClick={() => handleBulkAction('approve')}>
                 <CheckCircle className="w-4 h-4 mr-1" />
                 Approve ({selectedContent.length})
               </Button>
-              <Button 
-                variant="danger" 
-                size="sm"
-                onClick={() => handleBulkAction('reject')}
-              >
+              <Button variant="primary" size="sm" onClick={handleBulkMarkPosted}>
+                <Upload className="w-4 h-4 mr-1" />
+                Mark Posted ({selectedContent.length})
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => handleBulkAction('reject')}>
                 <XCircle className="w-4 h-4 mr-1" />
                 Reject ({selectedContent.length})
               </Button>
-              <Button 
-                variant="danger" 
-                size="sm"
-                onClick={() => setShowBulkDeleteConfirm(true)}
-              >
+              <Button variant="danger" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
                 <Trash2 className="w-4 h-4 mr-1" />
                 Delete ({selectedContent.length})
               </Button>
@@ -592,7 +615,7 @@ const AdminContent: React.FC = () => {
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContent.map((post) => (
-            <Card key={post.id} className="hover:shadow-xl transition-all duration-300 overflow-hidden">
+            <Card key={post.id} className="overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <input
                   type="checkbox"
@@ -614,11 +637,13 @@ const AdminContent: React.FC = () => {
                   <img 
                     src={post.images[0].image_url} 
                     alt="Content preview" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => setShowImageGallery({images: post.images!, index: 0})}
                   />
                   {post.images.length > 1 && (
-                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-                      +{post.images.length - 1} more
+                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                      <ImageIcon className="w-3 h-3" />
+                      {post.images.length} images
                     </div>
                   )}
                 </div>
@@ -649,48 +674,23 @@ const AdminContent: React.FC = () => {
                 </div>
               </div>
               
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+              {/* Updated Action Buttons */}
+              <div className="flex gap-2 mt-4 pt-4 border-t">
                 {post.status === 'pending-approval' && (
                   <>
-                    <Button 
-                      size="sm" 
-                      variant="success"
-                      className="flex-1"
-                      onClick={() => handleApproveContent(post.id)}
-                    >
+                    <Button size="sm" variant="success" onClick={() => handleApproveContent(post.id)} className="flex-1">
                       <CheckCircle className="w-4 h-4 mr-1" />
                       Approve
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleRejectContent(post.id)}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => handleRejectContent(post.id)} className="flex-1">
                       <XCircle className="w-4 h-4 mr-1" />
                       Reject
                     </Button>
                   </>
                 )}
                 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => openEditModal(post)}
-                  className="flex-1"
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-                
                 {post.status === 'approved' && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => openPostModal(post)}
-                    className="flex-1"
-                  >
+                  <Button size="sm" variant="primary" onClick={() => openPostModal(post)} className="flex-1">
                     <Upload className="w-4 h-4 mr-1" />
                     Mark Posted
                   </Button>
@@ -700,70 +700,50 @@ const AdminContent: React.FC = () => {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleDownloadImages(post.id)}
+                    onClick={() => setShowImageGallery({images: post.images!, index: 0})}
                   >
-                    <Download className="w-4 h-4 mr-1" />
-                    Images
+                    <ImageIcon className="w-4 h-4 mr-1" />
+                    View ({post.images.length})
                   </Button>
                 )}
                 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDownloadPost(post.id)}
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Data
-                </Button>
-                
-                {post.post_url && (
-                  <a
-                    href={post.post_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1"
-                  >
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-1" />
-                      View Post
-                    </Button>
-                  </a>
-                )}
-                
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => setShowDeleteConfirm(post)}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Delete
-                </Button>
+                {/* Dropdown Menu for Other Actions */}
+                <DropdownMenu
+                  items={[
+                    {
+                      label: 'Edit Post',
+                      icon: <Edit className="w-4 h-4" />,
+                      onClick: () => openEditModal(post)
+                    },
+                    ...(post.status !== 'draft' ? [{
+                      label: 'Set to Draft',
+                      icon: <Edit className="w-4 h-4" />,
+                      onClick: () => handleSetDraft(post.id)
+                    }] : []),
+                    ...(post.images && post.images.length > 0 ? [{
+                      label: 'Download Images',
+                      icon: <Download className="w-4 h-4" />,
+                      onClick: () => handleDownloadImages(post.id)
+                    }] : []),
+                    {
+                      label: 'Download Data',
+                      icon: <Download className="w-4 h-4" />,
+                      onClick: () => handleDownloadPost(post.id)
+                    },
+                    ...(post.post_url ? [{
+                      label: 'View Posted',
+                      icon: <ExternalLink className="w-4 h-4" />,
+                      onClick: () => window.open(post.post_url, '_blank')
+                    }] : []),
+                    {
+                      label: 'Delete Post',
+                      icon: <Trash2 className="w-4 h-4" />,
+                      onClick: () => setShowDeleteConfirm(post),
+                      variant: 'danger' as const
+                    }
+                  ]}
+                />
               </div>
-              
-              {post.status === 'posted' && (
-                <div className="flex gap-3 text-sm text-gray-600 mt-3 pt-3 border-t">
-                  <span className="flex items-center">
-                    <Heart className="w-4 h-4 mr-1 text-pink-500" />
-                    {post.likes || 0}
-                  </span>
-                  <span className="flex items-center">
-                    <MessageCircle className="w-4 h-4 mr-1 text-blue-500" />
-                    {post.comments || 0}
-                  </span>
-                  <span className="flex items-center">
-                    <Share2 className="w-4 h-4 mr-1 text-green-500" />
-                    {post.shares || 0}
-                  </span>
-                  <span className="flex items-center">
-                    <Eye className="w-4 h-4 mr-1 text-purple-500" />
-                    {post.views || 0}
-                  </span>
-                </div>
-              )}
             </Card>
           ))}
         </div>
@@ -1314,6 +1294,16 @@ const AdminContent: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Image Gallery Modal */}
+      {showImageGallery && (
+        <ImageGallery
+          images={showImageGallery.images}
+          isOpen={!!showImageGallery}
+          onClose={() => setShowImageGallery(null)}
+          initialIndex={showImageGallery.index}
+        />
       )}
     </div>
   );

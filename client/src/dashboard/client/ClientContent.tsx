@@ -7,6 +7,7 @@ import {
 import { Card, Button, Badge } from '../../components/ui';
 import ApiService from '../../services/ApiService';
 import type { ContentPost } from '../../types';
+import { ImageGallery } from '../../components/ImageGallery';
 
 // Enhanced ContentPost interface for this component
 interface EnhancedContentPost extends ContentPost {
@@ -49,7 +50,8 @@ const ClientContent: React.FC = () => {
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [imagePreview, setImagePreview] = useState<string[]>([]);
-  
+  const [showImageGallery, setShowImageGallery] = useState<{images: any[], index: number} | null>(null);
+
   const [formData, setFormData] = useState<ContentFormData>({
     platform: '',
     social_account: '',
@@ -378,7 +380,7 @@ const ClientContent: React.FC = () => {
 
   // GRID VIEW (DEFAULT)
   return (
-    <div className="space-y-6">
+    <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -520,7 +522,7 @@ const ClientContent: React.FC = () => {
       {/* Content Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredContent.map((post) => (
-          <Card key={post.id} className="hover:shadow-xl transition-all duration-300">
+          <Card key={post.id} className="overflow-hidden">
             {post.images && post.images.length > 0 && (
               <div className="h-48 bg-gray-100 -mx-6 -mt-6 mb-4 overflow-hidden">
                 <img 
@@ -562,14 +564,20 @@ const ClientContent: React.FC = () => {
                     href={post.post_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors mb-3"
+                    className="block w-full"
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Posted Content
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="w-full"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Live Post
+                    </Button>
                   </a>
                 )}
                 
-                <div className="pt-4 border-t">
+                <div className="pt-4 border-t mt-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center text-pink-600">
                       <Heart className="w-4 h-4 mr-1" />
@@ -592,6 +600,18 @@ const ClientContent: React.FC = () => {
               </>
             )}
             
+            {post.images && post.images.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => setShowImageGallery({images: post.images!, index: 0})}
+              >
+                <Image className="w-4 h-4 mr-2" />
+                View Images ({post.images.length})
+              </Button>
+            )}
+
             {post.status === 'draft' && (
               <Button size="sm" variant="outline" className="w-full">
                 <Edit className="w-4 h-4 mr-1" />
@@ -612,6 +632,16 @@ const ClientContent: React.FC = () => {
             Create Content
           </Button>
         </Card>
+      )}
+
+      {/* Image Gallery Modal */}
+      {showImageGallery && (
+        <ImageGallery
+          images={showImageGallery.images}
+          isOpen={!!showImageGallery}
+          onClose={() => setShowImageGallery(null)}
+          initialIndex={showImageGallery.index}
+        />
       )}
     </div>
   );
