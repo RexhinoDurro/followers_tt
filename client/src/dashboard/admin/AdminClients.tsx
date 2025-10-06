@@ -1,10 +1,9 @@
-// client/src/dashboard/admin/AdminClients.tsx - Fixed Version
+// client/src/dashboard/admin/AdminClients.tsx - With Payment Verification
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Plus, Search, Filter, MoreVertical, Edit, 
   DollarSign, TrendingUp, Mail, 
-  CheckCircle, AlertCircle, RefreshCw
-} from 'lucide-react';
+  CheckCircle, AlertCircle, RefreshCw, Clock} from 'lucide-react';
 import { Card, Button, Modal, Input, Badge } from '../../components/ui';
 import type { FormSubmitHandler } from '../../types';
 import ApiService from '../../services/ApiService';
@@ -25,6 +24,17 @@ interface Client {
   created_at: string;
 }
 
+interface PaymentVerification {
+  id: string;
+  client_name: string;
+  client_email: string;
+  client_full_name: string;
+  plan: string;
+  amount: number;
+  submitted_at: string;
+  status: string;
+}
+
 const AdminClients: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +45,12 @@ const AdminClients: React.FC = () => {
   const [showClientDetails, setShowClientDetails] = useState(false);
   const [, setShowEditClient] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Payment verification states
+  const [pendingVerifications, setPendingVerifications] = useState<PaymentVerification[]>([]);
+  const [showVerificationsModal, setShowVerificationsModal] = useState(false);
+  const [selectedVerification, setSelectedVerification] = useState<PaymentVerification | null>(null);
+  const [selectedPlanForApproval, setSelectedPlanForApproval] = useState('');
 
   const [newClient, setNewClient] = useState({
     name: '',
@@ -47,6 +63,7 @@ const AdminClients: React.FC = () => {
 
   useEffect(() => {
     fetchClients();
+    fetchPendingVerifications();
   }, []);
 
   const fetchClients = async () => {
@@ -57,7 +74,6 @@ const AdminClients: React.FC = () => {
       const data = await ApiService.getClients();
       console.log('Received clients data:', data);
       
-      // The ApiService now handles pagination, so data should be an array
       const clientsArray = Array.isArray(data) ? data : [];
       
       console.log('Setting clients:', clientsArray);
@@ -71,17 +87,60 @@ const AdminClients: React.FC = () => {
     }
   };
 
+  const fetchPendingVerifications = async () => {
+    try {
+      const data = await ApiService.getPendingVerifications();
+      console.log('Pending verifications:', data);
+      if (typeof data === 'object' && data !== null && 'verifications' in data) {
+        setPendingVerifications((data as { verifications: PaymentVerification[] }).verifications || []);
+      } else {
+        setPendingVerifications([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pending verifications:', error);
+      setPendingVerifications([]);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchClients();
+    await fetchPendingVerifications();
+  };
+
+  const handleApproveVerification = async () => {
+    if (!selectedVerification || !selectedPlanForApproval) {
+      alert('Please select a plan for approval');
+      return;
+    }
+
+    try {
+      await ApiService.approvePaymentVerification(
+        selectedVerification.id,
+        selectedPlanForApproval
+      );
+      
+      alert('Payment verification approved successfully!');
+      
+      // Refresh data
+      await fetchClients();
+      await fetchPendingVerifications();
+      
+      // Close modal
+      setSelectedVerification(null);
+      setSelectedPlanForApproval('');
+      setShowVerificationsModal(false);
+      
+    } catch (error) {
+      console.error('Failed to approve verification:', error);
+      alert('Failed to approve verification. Please try again.');
+    }
   };
 
   const handleAddClient: FormSubmitHandler = async (e) => {
     e.preventDefault();
     try {
-      // In a real app, you would call an API endpoint to add the client
       console.log('Adding client:', newClient);
-      // await ApiService.createClient(newClient);
       
       await fetchClients();
       setShowAddClient(false);
@@ -102,9 +161,7 @@ const AdminClients: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this client?')) return;
     
     try {
-      // In a real app, you would call an API endpoint to delete the client
       console.log('Deleting client:', clientId);
-      // await ApiService.deleteClient(clientId);
       await fetchClients();
     } catch (error) {
       console.error('Failed to delete client:', error);
@@ -135,7 +192,8 @@ const AdminClients: React.FC = () => {
     total: clients.length,
     active: clients.filter(c => c.status === 'active').length,
     revenue: clients.reduce((sum, c) => sum + (c.status === 'active' ? c.monthly_fee : 0), 0),
-    overdue: clients.filter(c => c.payment_status === 'overdue').length
+    overdue: clients.filter(c => c.payment_status === 'overdue').length,
+    pendingVerifications: pendingVerifications.length
   };
 
   if (loading) {
@@ -155,6 +213,19 @@ const AdminClients: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage your agency's client accounts</p>
         </div>
         <div className="flex gap-3">
+          {pendingVerifications.length > 0 && (
+            <Button 
+              variant="outline"
+              onClick={() => setShowVerificationsModal(true)}
+              className="relative"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Pending Verifications
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                {pendingVerifications.length}
+              </span>
+            </Button>
+          )}
           <Button 
             variant="outline" 
             onClick={handleRefresh}
@@ -171,7 +242,7 @@ const AdminClients: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -209,6 +280,16 @@ const AdminClients: React.FC = () => {
               <p className="text-3xl font-bold">{stats.overdue}</p>
             </div>
             <AlertCircle className="w-8 h-8 text-red-200" />
+          </div>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-amber-100">Pending Approvals</p>
+              <p className="text-3xl font-bold">{stats.pendingVerifications}</p>
+            </div>
+            <Clock className="w-8 h-8 text-amber-200" />
           </div>
         </Card>
       </div>
@@ -378,15 +459,95 @@ const AdminClients: React.FC = () => {
         </div>
       )}
 
-      {/* Empty State for Filtered Results */}
-      {clients.length > 0 && filteredClients.length === 0 && (
-        <Card className="text-center py-8">
-          <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">No clients match your search criteria</p>
-        </Card>
-      )}
+      {/* Payment Verifications Modal */}
+      <Modal
+        isOpen={showVerificationsModal}
+        onClose={() => {
+          setShowVerificationsModal(false);
+          setSelectedVerification(null);
+          setSelectedPlanForApproval('');
+        }}
+        title="Pending Payment Verifications"
+        size="lg"
+      >
+        <div className="space-y-4">
+          {pendingVerifications.length === 0 ? (
+            <div className="text-center py-8">
+              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+              <p className="text-gray-600">No pending verifications</p>
+            </div>
+          ) : (
+            pendingVerifications.map((verification) => (
+              <div key={verification.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{verification.client_name}</h3>
+                    <p className="text-sm text-gray-600">{verification.client_email}</p>
+                  </div>
+                  <Badge variant="warning">Pending</Badge>
+                </div>
 
-      {/* Add Client Modal */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Client Full Name:</p>
+                    <p className="font-medium text-gray-900">{verification.client_full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Requested Plan:</p>
+                    <p className="font-medium text-gray-900">{verification.plan}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Amount:</p>
+                    <p className="font-medium text-gray-900">${verification.amount}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Submitted:</p>
+                    <p className="font-medium text-gray-900">
+                      {new Date(verification.submitted_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Plan to Approve:
+                  </label>
+                  <div className="flex gap-3">
+                    <select
+                      value={selectedVerification?.id === verification.id ? selectedPlanForApproval : ''}
+                      onChange={(e) => {
+                        setSelectedVerification(verification);
+                        setSelectedPlanForApproval(e.target.value);
+                      }}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">Select a plan...</option>
+                      <option value="starter">Starter - $100/mo</option>
+                      <option value="pro">Pro - $250/mo</option>
+                      <option value="premium">Premium - $400/mo</option>
+                    </select>
+                    <Button
+                      onClick={() => {
+                        setSelectedVerification(verification);
+                        if (selectedPlanForApproval) {
+                          handleApproveVerification();
+                        }
+                      }}
+                      disabled={!selectedPlanForApproval || selectedVerification?.id !== verification.id}
+                      variant="success"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Approve
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      {/* Add Client Modal - same as before */}
       <Modal
         isOpen={showAddClient}
         onClose={() => setShowAddClient(false)}
@@ -476,7 +637,7 @@ const AdminClients: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Client Details Modal */}
+      {/* Client Details Modal - same as before */}
       {selectedClient && showClientDetails && (
         <Modal
           isOpen={showClientDetails}

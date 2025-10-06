@@ -1,4 +1,4 @@
-# Add to server/api/views/admin/bank_settings_views.py
+# server/api/views/admin/bank_settings_views.py - Updated with Plan Selection
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +10,25 @@ import logging
 from ...models import AdminBankSettings, PaymentVerification, Client
 
 logger = logging.getLogger(__name__)
+
+# Plan configurations matching frontend
+PLAN_CONFIGS = {
+    'starter': {
+        'name': 'Starter Plan',
+        'monthly_fee': 100,
+        'package': 'Starter Plan'
+    },
+    'pro': {
+        'name': 'Pro Plan',
+        'monthly_fee': 250,
+        'package': 'Pro Plan'
+    },
+    'premium': {
+        'name': 'Premium Plan',
+        'monthly_fee': 400,
+        'package': 'Premium Plan'
+    }
+}
 
 
 @api_view(['GET', 'POST'])
@@ -138,11 +157,9 @@ def submit_payment_verification(request):
             status='pending'
         )
         
-        # Update client status to pending
+        # Update client status to pending (but don't activate yet)
         client.status = 'pending'
         client.payment_status = 'pending'
-        client.current_plan = plan
-        client.monthly_fee = amount
         client.save()
         
         logger.info(f"Payment verification submitted for client {client.name}")
@@ -195,7 +212,7 @@ def get_pending_verifications(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def approve_payment_verification(request, verification_id):
-    """Approve payment verification (admin only)"""
+    """Approve payment verification with plan selection (admin only)"""
     if request.user.role != 'admin':
         return Response(
             {'error': 'Admin access required'},
@@ -204,29 +221,49 @@ def approve_payment_verification(request, verification_id):
     
     try:
         verification = PaymentVerification.objects.get(id=verification_id)
+        plan_id = request.data.get('plan_id', '').lower()
         
+        if not plan_id or plan_id not in PLAN_CONFIGS:
+            return Response(
+                {'error': f'Invalid plan. Must be one of: {", ".join(PLAN_CONFIGS.keys())}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get plan configuration
+        plan_config = PLAN_CONFIGS[plan_id]
+        
+        # Update verification status
         verification.status = 'approved'
         verification.approved_at = timezone.now()
         verification.approved_by = request.user
         verification.save()
         
-        # Update client
+        # Update client with selected plan
         client = verification.client
         client.status = 'active'
         client.payment_status = 'paid'
+        client.current_plan = plan_id
+        client.package = plan_config['package']
+        client.monthly_fee = plan_config['monthly_fee']
         client.subscription_start_date = timezone.now()
         
-        # Set next payment date
+        # Set next payment date (1 month from now)
         from datetime import timedelta
         client.next_payment = timezone.now().date() + timedelta(days=30)
         
+        # Update total spent
+        client.total_spent += verification.amount
+        
         client.save()
         
-        logger.info(f"Payment verification approved for client {client.name}")
+        logger.info(f"Payment verification approved for client {client.name} - Plan: {plan_config['name']}")
         
         return Response({
             'success': True,
-            'message': 'Payment verification approved'
+            'message': f'Payment verification approved. Client activated with {plan_config["name"]}',
+            'client_id': str(client.id),
+            'plan': plan_config['name'],
+            'monthly_fee': plan_config['monthly_fee']
         })
         
     except PaymentVerification.DoesNotExist:

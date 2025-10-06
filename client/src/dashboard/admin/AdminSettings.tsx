@@ -34,6 +34,17 @@ interface BankSettings {
   additional_info: string;
 }
 
+interface BankSettingsResponse {
+  id?: string;
+  admin_full_name: string;
+  iban: string;
+  bank_name: string;
+  swift_code: string;
+  additional_info: string;
+  configured: boolean;
+  updated_at?: string;
+}
+
 const AdminSettings: React.FC = () => {
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -123,7 +134,7 @@ const AdminSettings: React.FC = () => {
 
   const fetchBankSettings = async () => {
     try {
-      const data = await ApiService.getAdminBankSettings();
+      const data = await ApiService.getAdminBankSettings() as BankSettingsResponse;
       if (data.configured) {
         setBankSettings({
           admin_full_name: data.admin_full_name || '',

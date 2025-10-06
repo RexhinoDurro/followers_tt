@@ -703,6 +703,62 @@ class ApiService {
     });
   }
 
+  // ============ ADMIN BANK SETTINGS METHODS ============
+  
+  /**
+   * Get admin bank account settings for displaying to clients
+   */
+  async getAdminBankSettings() {
+    return await this.request('/admin/bank-settings/');
+  }
+
+  /**
+   * Update admin bank account settings (admin only)
+   */
+  async updateAdminBankSettings(data: {
+    admin_full_name: string;
+    iban: string;
+    bank_name?: string;
+    swift_code?: string;
+    additional_info?: string;
+  }) {
+    return await this.request('/admin/bank-settings/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Submit payment verification for bank transfer (client)
+   */
+  async submitPaymentVerification(data: {
+    plan: string;
+    amount: number;
+    client_full_name: string;
+  }) {
+    return await this.request('/billing/submit-verification/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Get pending payment verifications (admin only)
+   */
+  async getPendingVerifications() {
+    return await this.request('/admin/pending-verifications/');
+  }
+
+  /**
+   * Approve payment verification (admin only)
+   */
+  async approvePaymentVerification(verificationId: string, planId: string) {
+    return await this.request(`/admin/approve-verification/${verificationId}/`, {
+      method: 'POST',
+      body: JSON.stringify({ plan_id: planId }),
+    });
+  }
+
   // New method to get all pages of paginated data if needed
   async getAllPaginatedData<T>(endpoint: string, maxPages: number = 10): Promise<T[]> {
     let allData: T[] = [];
