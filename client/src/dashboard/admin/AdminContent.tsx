@@ -615,7 +615,7 @@ const AdminContent: React.FC = () => {
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContent.map((post) => (
-            <Card key={post.id} className="overflow-hidden">
+            <Card key={post.id} className="overflow-visible relative">
               <div className="flex items-center justify-between mb-3">
                 <input
                   type="checkbox"
@@ -633,7 +633,7 @@ const AdminContent: React.FC = () => {
               
               {/* Images Display */}
               {post.images && post.images.length > 0 && (
-                <div className="h-48 bg-gray-100 -mx-6 -mt-6 mb-4 overflow-hidden relative">
+                <div className="h-48 bg-gray-100 mb-4 overflow-hidden relative rounded-lg">
                   <img 
                     src={post.images[0].image_url} 
                     alt="Content preview" 
