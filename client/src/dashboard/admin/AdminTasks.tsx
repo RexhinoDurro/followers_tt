@@ -886,7 +886,7 @@ const AdminTasks: React.FC = () => {
               label="Due Date"
               type="datetime-local"
               value={showEditTask && selectedTask ? selectedTask.due_date : newTask.due_date}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 if (showEditTask && selectedTask) {
                   setSelectedTask({ ...selectedTask, due_date: e.target.value });
                 } else {
