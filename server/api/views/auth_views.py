@@ -12,6 +12,7 @@ from ..serializers import (
     UserSerializer, UserRegistrationSerializer, UserLoginSerializer
 )
 from ..models import User
+from ..services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +154,9 @@ def verify_and_register(request):
             user = serializer.save()
             token, created = Token.objects.get_or_create(user=user)
             
+            # 🔔 NEW: Notify admins of new user registration
+            NotificationService.notify_new_user_registered(user)
+            
             # Send welcome email (non-blocking)
             if EMAIL_SERVICE_AVAILABLE:
                 try:
@@ -232,6 +236,9 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         token, created = Token.objects.get_or_create(user=user)
+        
+        # 🔔 NEW: Notify admins of new user registration
+        NotificationService.notify_new_user_registered(user)
         
         return Response({
             'user': UserSerializer(user).data,

@@ -9,6 +9,7 @@ import logging
 
 from ..models import User, Client, Message
 from ..serializers import MessageSerializer
+from ..services.notification_service import NotificationService  # NEW IMPORT
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,14 @@ class MessageViewSet(ModelViewSet):
         ).order_by('-timestamp')
     
     def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
+        message = serializer.save(sender=self.request.user)
+        
+        # 🔔 NEW: Notify recipient of new message
+        sender_name = f"{self.request.user.first_name} {self.request.user.last_name}" if self.request.user.first_name else self.request.user.email
+        NotificationService.notify_message_received(
+            recipient_user=message.receiver,
+            sender_name=sender_name
+        )
     
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -117,6 +125,10 @@ def send_message_to_admin(request):
             content=content
         )
         
+        # 🔔 NEW: Notify admin of new message
+        sender_name = f"{request.user.first_name} {request.user.last_name}" if request.user.first_name else request.user.email
+        NotificationService.notify_message_to_admin(sender_name)
+        
         logger.info(f"Message sent from {request.user.username} to admin {admin_user.username}")
         
         serializer = MessageSerializer(message)
@@ -139,9 +151,6 @@ def send_message_to_client(request):
         client_id = request.data.get('client_id')
         content = request.data.get('content')
         
-        logger.info(f"Admin {request.user.username} sending message to client {client_id}")
-        logger.info(f"Message content: {content}")
-        
         if not content or not client_id:
             return Response({'error': 'Client ID and message content are required'}, 
                           status=status.HTTP_400_BAD_REQUEST)
@@ -151,10 +160,7 @@ def send_message_to_client(request):
             client = Client.objects.get(id=client_id)
             client_user = client.user
             
-            logger.info(f"Found client: {client.name} with user: {client_user.username}")
-            
         except Client.DoesNotExist:
-            logger.error(f"Client not found with ID: {client_id}")
             return Response({'error': 'Client not found'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
@@ -163,6 +169,13 @@ def send_message_to_client(request):
             sender=request.user,
             receiver=client_user,
             content=content
+        )
+        
+        # 🔔 NEW: Notify client of new message
+        sender_name = f"{request.user.first_name} {request.user.last_name}" if request.user.first_name else "Admin"
+        NotificationService.notify_message_received(
+            recipient_user=client_user,
+            sender_name=sender_name
         )
         
         logger.info(f"Message created successfully with ID: {message.id}")

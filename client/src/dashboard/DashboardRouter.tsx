@@ -1,4 +1,4 @@
-// client/src/dashboard/DashboardRouter.tsx - Updated with Client Settings
+// client/src/dashboard/DashboardRouter.tsx - UPDATED WITH NOTIFICATIONS
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from './DashboardLayout';
@@ -20,7 +20,10 @@ import ClientContent from './client/ClientContent.tsx';
 import ClientPerformance from './client/ClientPerformance.tsx';
 import ClientMessages from './client/ClientMessages.tsx';
 import ClientBilling from './client/ClientBilling.tsx';
-import ClientSettings from './client/ClientSettings'; // Add this import
+import ClientSettings from './client/ClientSettings';
+
+// Shared Pages
+import NotificationsPage from './NotificationsPage'; // NEW
 
 export const DashboardRouter: React.FC = () => {
   const { user, logout } = useAuth();
@@ -48,7 +51,8 @@ export const DashboardRouter: React.FC = () => {
     performance: <AdminPerformance />,
     messages: <AdminMessages />,
     invoices: <AdminInvoices />,
-    settings: <AdminSettings />
+    settings: <AdminSettings />,
+    notifications: <NotificationsPage /> // NEW
   };
 
   // Client pages mapping
@@ -58,7 +62,8 @@ export const DashboardRouter: React.FC = () => {
     performance: <ClientPerformance />,
     messages: <ClientMessages />,
     billing: <ClientBilling />,
-    settings: <ClientSettings /> // Add settings page
+    settings: <ClientSettings />,
+    notifications: <NotificationsPage /> // NEW
   };
 
   const pages = user.role === 'admin' ? adminPages : clientPages;

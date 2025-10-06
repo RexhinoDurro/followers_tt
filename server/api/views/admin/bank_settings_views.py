@@ -8,6 +8,7 @@ from django.utils import timezone
 import logging
 
 from ...models import AdminBankSettings, PaymentVerification, Client
+from ...services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,13 @@ def submit_payment_verification(request):
         client.payment_status = 'pending'
         client.save()
         
+        # 🔔 NEW: Notify admins of payment verification submission
+        NotificationService.notify_payment_verification_submitted(
+            client=client,
+            amount=amount,
+            plan=plan
+        )
+        
         logger.info(f"Payment verification submitted for client {client.name}")
         
         return Response({
@@ -255,6 +263,18 @@ def approve_payment_verification(request, verification_id):
         client.total_spent += verification.amount
         
         client.save()
+        
+        # 🔔 NEW: Notify client that subscription is activated
+        NotificationService.notify_subscription_activated(
+            client_user=client.user,
+            plan_name=plan_config['name']
+        )
+        
+        # 🔔 NEW: Notify admins of new subscription
+        NotificationService.notify_subscription_created(
+            client=client,
+            plan_name=plan_config['name']
+        )
         
         logger.info(f"Payment verification approved for client {client.name} - Plan: {plan_config['name']}")
         

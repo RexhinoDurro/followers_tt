@@ -165,6 +165,17 @@ export interface Notification {
   created_at: string;
 }
 
+// Update NotificationSerializer type if needed
+export interface NotificationSerializer {
+  id: string;
+  user: string;
+  title: string;
+  message: string;
+  notification_type: string;
+  read: boolean;
+  created_at: string;
+}
+
 // Service-related types
 export interface Service {
   id: string;

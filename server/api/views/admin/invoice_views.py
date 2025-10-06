@@ -26,6 +26,9 @@ from ...serializers import (
     SocialMediaAccountSerializer, RealTimeMetricsSerializer
 )
 
+# NEW: Import the NotificationService
+from ...services.notification_service import NotificationService
+
 logger = logging.getLogger(__name__)
 
 from ...models import (
@@ -54,7 +57,14 @@ class InvoiceViewSet(ModelViewSet):
         # Only admins can create invoices
         if self.request.user.role != 'admin':
             raise PermissionError('Admin access required')
-        serializer.save()
+        
+        invoice = serializer.save()
+        
+        # 🔔 NEW: Notify client of new invoice
+        NotificationService.notify_invoice_created(
+            client_user=invoice.client.user,
+            invoice=invoice
+        )
     
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
@@ -73,5 +83,11 @@ class InvoiceViewSet(ModelViewSet):
         client.payment_status = 'paid'
         client.next_payment = timezone.now().date() + timedelta(days=30)
         client.save()
+        
+        # 🔔 NEW: Notify client that payment was received
+        NotificationService.notify_payment_received(
+            client_user=client.user,
+            invoice=invoice
+        )
         
         return Response({'message': 'Invoice marked as paid'})

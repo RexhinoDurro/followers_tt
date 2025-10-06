@@ -1,20 +1,24 @@
-// client/src/components/NotificationDropdown.tsx
+// client/src/components/NotificationDropdown.tsx - COMPLETE VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Bell, 
   CheckCircle, 
   AlertCircle, 
   MessageSquare, 
-
   Check,
   X,
-  Clock
+  Clock,
+  TrendingUp,
+  FileText
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+
 export const NotificationDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { user } = useAuth();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -28,18 +32,37 @@ export const NotificationDropdown: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getIcon = (type: 'success' | 'error' | 'warning' | 'info') => {
+  const getIcon = (type: string) => {
     switch (type) {
-      case 'success':
+      case 'content_approved':
         return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'warning':
+      case 'task_assigned':
+        return <FileText className="w-5 h-5 text-blue-500" />;
+      case 'payment_due':
         return <AlertCircle className="w-5 h-5 text-yellow-500" />;
-      case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-      case 'info':
-        return <MessageSquare className="w-5 h-5 text-blue-500" />;
+      case 'message_received':
+        return <MessageSquare className="w-5 h-5 text-purple-500" />;
+      case 'performance_update':
+        return <TrendingUp className="w-5 h-5 text-indigo-500" />;
       default:
-        return <AlertCircle className="w-5 h-5 text-gray-500" />;
+        return <Bell className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'content_approved':
+        return 'bg-green-50 border-green-200';
+      case 'task_assigned':
+        return 'bg-blue-50 border-blue-200';
+      case 'payment_due':
+        return 'bg-yellow-50 border-yellow-200';
+      case 'message_received':
+        return 'bg-purple-50 border-purple-200';
+      case 'performance_update':
+        return 'bg-indigo-50 border-indigo-200';
+      default:
+        return 'bg-gray-50 border-gray-200';
     }
   };
 
@@ -59,20 +82,27 @@ export const NotificationDropdown: React.FC = () => {
     if (!notification.read) {
       markAsRead(notification.id);
     }
+    
     // Handle navigation based on notification type
-    switch (notification.notification_type) {
-      case 'success':
-        window.location.hash = 'tasks';
+    const notifType = notification.notification_type;
+    switch (notifType) {
+      case 'content_approved':
+        window.location.hash = 'content';
         break;
-      case 'info':
+      case 'message_received':
         window.location.hash = 'messages';
         break;
-      case 'warning':
-        window.location.hash = 'billing';
+      case 'payment_due':
+        window.location.hash = user?.role === 'admin' ? 'invoices' : 'billing';
         break;
-      case 'error':
-        window.location.hash = 'alerts';
+      case 'task_assigned':
+        window.location.hash = 'tasks';
         break;
+      case 'performance_update':
+        window.location.hash = 'performance';
+        break;
+      default:
+        window.location.hash = 'overview';
     }
     setIsOpen(false);
   };
@@ -82,11 +112,12 @@ export const NotificationDropdown: React.FC = () => {
       {/* Notification Bell */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+        className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+        aria-label="Notifications"
       >
         <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center animate-pulse font-semibold">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -110,6 +141,7 @@ export const NotificationDropdown: React.FC = () => {
               <button
                 onClick={() => setIsOpen(false)}
                 className="text-white/80 hover:text-white transition-colors"
+                aria-label="Close notifications"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -125,7 +157,7 @@ export const NotificationDropdown: React.FC = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllAsRead()}
-                  className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1"
+                  className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1 transition-colors"
                 >
                   <Check className="w-4 h-4" />
                   <span>Mark all as read</span>
@@ -139,60 +171,65 @@ export const NotificationDropdown: React.FC = () => {
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No notifications yet</p>
+                <p className="text-gray-500 font-medium">No notifications yet</p>
                 <p className="text-sm text-gray-400 mt-1">We'll notify you when something happens</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
-                {notifications.slice(0, 10).map((notification) => (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      !notification.read ? 'bg-purple-50/50' : ''
-                    }`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 mt-1">
-                        {getIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-gray-900`}>
-                              {notification.title}
-                            </p>
-                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                              {notification.message}
-                            </p>
-                          </div>
-                          {!notification.read && (
-                            <div className="ml-2 flex-shrink-0">
-                              <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                            </div>
-                          )}
+                {notifications.slice(0, 10).map((notification) => {
+                  const notifType = notification.notification_type;
+                  const typeColor = getTypeColor(notifType);
+                  
+                  return (
+                    <div
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
+                        !notification.read ? 'bg-purple-50/50 border-l-4 border-purple-500' : ''
+                      }`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`flex-shrink-0 mt-1 p-2 rounded-lg ${typeColor} border`}>
+                          {getIcon(notifType)}
                         </div>
-                        <div className="flex items-center mt-2 text-xs text-gray-500">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {formatTime(notification.timestamp)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className={`text-sm ${!notification.read ? 'font-semibold' : 'font-medium'} text-gray-900`}>
+                                {notification.title}
+                              </p>
+                              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                {notification.message}
+                              </p>
+                            </div>
+                            {!notification.read && (
+                              <div className="ml-2 flex-shrink-0">
+                                <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center mt-2 text-xs text-gray-500">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {formatTime(notification.created_at)}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
+          {notifications.length > 10 && (
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
               <button
                 onClick={() => {
                   window.location.hash = 'notifications';
                   setIsOpen(false);
                 }}
-                className="text-sm text-purple-600 hover:text-purple-700 font-medium w-full text-center"
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium w-full text-center transition-colors"
               >
                 View all notifications →
               </button>
@@ -203,4 +240,3 @@ export const NotificationDropdown: React.FC = () => {
     </div>
   );
 };
-

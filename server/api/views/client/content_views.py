@@ -16,6 +16,7 @@ import io
 
 from ...models import ContentPost, ContentImage, Client, SocialMediaAccount
 from ...serializers import ContentPostSerializer, ContentImageSerializer
+from ...services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,11 @@ class ContentPostViewSet(ModelViewSet):
                     order=i
                 )
             
+            # 🔔 NEW: Send notifications
+            if request.user.role == 'client':
+                # Notify admins when client submits content for approval
+                NotificationService.notify_content_submitted(content_post)
+            
             logger.info(f"Content post created: {content_post.id}")
             
             # Return serialized data
@@ -268,6 +274,12 @@ class ContentPostViewSet(ModelViewSet):
         content.approved_at = timezone.now()
         content.save()
         
+        # 🔔 NEW: Notify client that their content was approved
+        NotificationService.notify_content_approved(
+            client_user=content.client.user,
+            content_post=content
+        )
+        
         serializer = self.get_serializer(content)
         return Response(serializer.data)
     
@@ -284,6 +296,13 @@ class ContentPostViewSet(ModelViewSet):
         if feedback:
             content.admin_message = feedback
         content.save()
+        
+        # 🔔 NEW: Notify client that their content needs revision
+        NotificationService.notify_content_rejected(
+            client_user=content.client.user,
+            content_post=content,
+            feedback=feedback
+        )
         
         serializer = self.get_serializer(content)
         return Response(serializer.data)
@@ -314,6 +333,12 @@ class ContentPostViewSet(ModelViewSet):
         content.views = request.data.get('views', 0)
         
         content.save()
+        
+        # 🔔 NEW: Notify client that their content was posted
+        NotificationService.notify_content_posted(
+            client_user=content.client.user,
+            content_post=content
+        )
         
         serializer = self.get_serializer(content)
         return Response(serializer.data)
@@ -513,7 +538,7 @@ class ContentPostViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        content_posts = ContentPost.objects.filter(id__in=content_ids)
+        content_posts = ContentPost.objects.filter(id__in=content_ids).select_related('client__user')
         
         if action_type == 'approve':
             content_posts.update(
@@ -521,12 +546,29 @@ class ContentPostViewSet(ModelViewSet):
                 approved_by=request.user,
                 approved_at=timezone.now()
             )
+            
+            # 🔔 NEW: Notify each client their content was approved
+            for content in content_posts:
+                NotificationService.notify_content_approved(
+                    client_user=content.client.user,
+                    content_post=content
+                )
+            
             message = f'{content_posts.count()} posts approved'
         else:  # reject
             update_data = {'status': 'draft'}
             if feedback:
                 update_data['admin_message'] = feedback
             content_posts.update(**update_data)
+            
+            # 🔔 NEW: Notify each client their content needs revision
+            for content in content_posts:
+                NotificationService.notify_content_rejected(
+                    client_user=content.client.user,
+                    content_post=content,
+                    feedback=feedback
+                )
+            
             message = f'{content_posts.count()} posts rejected'
         
         return Response({'message': message, 'count': content_posts.count()})

@@ -15,6 +15,7 @@ from rest_framework.response import Response
 import requests
 import dateutil.parser
 from ..models import Client, Invoice, User
+from ..services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -298,6 +299,18 @@ def approve_subscription(request):
             
             logger.info(f"Subscription {subscription_id} SUCCESSFULLY ACTIVATED for user {request.user.id} after PayPal confirmation")
             
+            # 🔔 NEW: Notify client of subscription activation
+            NotificationService.notify_subscription_activated(
+                client_user=request.user,
+                plan_name=current_plan
+            )
+            
+            # 🔔 NEW: Notify admins of new subscription
+            NotificationService.notify_subscription_created(
+                client=client,
+                plan_name=current_plan
+            )
+            
             return Response({
                 'success': True,
                 'subscription_id': subscription_id,
@@ -468,6 +481,12 @@ def cancel_subscription(request):
         client.save()
         
         logger.info(f"Server-managed subscription cancelled for user {request.user.id}")
+        
+        # 🔔 NEW: Notify client of cancellation
+        NotificationService.notify_subscription_cancelled(client.user)
+        
+        # 🔔 NEW: Notify admins of cancellation
+        NotificationService.notify_client_cancelled_subscription(client)
         
         return Response({
             'success': True,
