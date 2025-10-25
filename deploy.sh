@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Deploy script for VisionBoost Agency
+# Deploy script for montrose Agency
 # This script builds the client and deploys to productions
 
 set -e  # Exit on any error
@@ -61,17 +61,17 @@ print_status "Deploying to production directory..."
 cd ..
 
 # Remove old files
-print_status "Removing old files from /var/www/visionboost.agency/"
-sudo rm -rf /var/www/visionboost.agency/*
+print_status "Removing old files from /var/www/montrose.agency/"
+sudo rm -rf /var/www/montrose.agency/*
 
 # Copy new files
-print_status "Copying new files to /var/www/visionboost.agency/"
-sudo cp -r client/dist/* /var/www/visionboost.agency/
+print_status "Copying new files to /var/www/montrose.agency/"
+sudo cp -r client/dist/* /var/www/montrose.agency/
 
 # Set proper permissions
 print_status "Setting proper file permissions..."
-sudo chown -R www-data:www-data /var/www/visionboost.agency/
-sudo chmod -R 755 /var/www/visionboost.agency/
+sudo chown -R www-data:www-data /var/www/montrose.agency/
+sudo chmod -R 755 /var/www/montrose.agency/
 
 print_success "Files deployed successfully"
 
@@ -123,12 +123,12 @@ fi
 echo ""
 echo "🎉 Deployment completed successfully!"
 echo "📊 Deployment Summary:"
-echo "   • Client built and deployed to /var/www/visionboost.agency/"
+echo "   • Client built and deployed to /var/www/montrose.agency/"
 echo "   • Nginx reloaded"
 echo "   • Gunicorn restarted (if applicable)"
 echo "   • File permissions set correctly"
 echo ""
-echo "🌐 Your application should now be live at: https://visionboost.agency"
+echo "🌐 Your application should now be live at: https://montrose.agency"
 echo ""
 echo "📝 Deploy time: $(date)"
 echo ""
