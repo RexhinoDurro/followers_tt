@@ -4,7 +4,7 @@ class ApiService {
   private token: string | null;
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'https://visionboost.agency/api';
+    this.baseURL = import.meta.env.VITE_API_URL || 'https://montrose.agency/api';
     this.token = localStorage.getItem('auth_token');
   }
 
