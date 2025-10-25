@@ -544,7 +544,7 @@ if DEBUG:
 # Production overrides
 else:
     # Add production domain to CORS and CSRF settings
-    PRODUCTION_DOMAIN = config('PRODUCTION_DOMAIN', default='https://visionboost.agency')
+    PRODUCTION_DOMAIN = config('PRODUCTION_DOMAIN', default='https://montrose.agency')
     
     CORS_ALLOWED_ORIGINS.extend([
         PRODUCTION_DOMAIN,
