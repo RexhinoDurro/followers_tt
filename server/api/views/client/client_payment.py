@@ -73,6 +73,3 @@ class ClientViewSet(ModelViewSet):
             return Response({'message': 'Payment status updated'})
         else:
             return Response({'error': 'Invalid payment status'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-

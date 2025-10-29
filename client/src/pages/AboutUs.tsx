@@ -1,4 +1,3 @@
-
 const AboutUs = () => {
   const stats = [
     { number: "500K+", label: "Active Users", icon: "👥" },

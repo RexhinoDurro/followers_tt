@@ -1,5 +1,3 @@
-
-
 // data/faq.ts
 export const faqData = [
   {

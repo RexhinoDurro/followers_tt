@@ -164,5 +164,3 @@ def send_subscription_renewal_reminders():
     except Exception as e:
         logger.error(f"Error sending renewal reminders: {e}")
         return f"Error: {str(e)}"
-
-

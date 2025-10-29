@@ -42,4 +42,3 @@ def debug_task(self):
     """Debug task for testing Celery setup"""
     print(f'Request: {self.request!r}')
     return 'Celery is working!'
-
